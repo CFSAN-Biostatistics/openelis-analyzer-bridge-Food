@@ -252,6 +252,22 @@ class OutboxDispatcherTest {
   }
 
   @Test
+  @DisplayName("holds a sample whose only observations are raised flags, which OpenELIS does not count as results")
+  void holdsASampleWithOnlyFlags() {
+    String id = queueOneDelivery(
+      "{\"resourceType\":\"Bundle\",\"entry\":[{\"resource\":{\"resourceType\":\"Observation\",\"extension\":[" +
+      "{\"url\":\"https://openelis-global.org/fhir/StructureDefinition/analyzer-result-classification\"," +
+      "\"valueCode\":\"SAMPLE_FLAG\"}]}}]}"
+    );
+    ScriptedOpenElis openElis = ScriptedOpenElis.create();
+
+    dispatcher(openElis).dispatchDue();
+
+    assertEquals(FailureReason.PARSE_NO_RESULTS, store.get(id).orElseThrow().failureReason());
+    assertTrue(openElis.sent.isEmpty(), "nothing is sent for a sample with only flags");
+  }
+
+  @Test
   @DisplayName("stops retrying what OpenELIS has refused, and says which refusal it was")
   void stopsRetryingARefusal() {
     String id = queueOneDelivery();

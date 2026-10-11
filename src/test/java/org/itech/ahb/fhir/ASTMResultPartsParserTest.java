@@ -283,6 +283,29 @@ class ASTMResultPartsParserTest {
     );
   }
 
+  @Test
+  void aControlEveryTestOnTheCartridgeReportsIsOneFlagOnTheSample() throws Exception {
+    ObjectNode profile = BaselineProfileFixtures.genexpertHivViralLoad(new ObjectMapper());
+    ObjectNode flags = profile.putObject("sample_flags");
+    flags.put("raisedValue", "FAIL");
+    flags.putArray("codes").add("SPC");
+    flags.putObject("names").put("SPC", "Sample processing control failed");
+
+    ParsedResults parsed = ASTMResultParser.parseRaw(
+      header() +
+      "O|1|ACC-1||^^^HIVVL|R|20221115035816|||||||||ORH||||||||||F\r" +
+      main("NOT DETECTED^", "40.00 to 10000000.00", "A") +
+      "R|7|^^^HIVVL^^^SPC^|FAIL^|||\r" +
+      "R|8|^^^OTHER^^^SPC^|FAIL^|||\r" +
+      "L|1|N\r",
+      ControlResultRecognition.none(),
+      AstmResultRecordSelection.all(),
+      ResultReading.fromProfile(profile)
+    );
+
+    assertThat(parsed.sampleFlags()).containsExactly(new SampleFlag("SPC", "Sample processing control failed", "FAIL"));
+  }
+
   private static ParsedResults parse(String message) {
     ParsedResults parsed = ASTMResultParser.parseRaw(
       message,

@@ -127,8 +127,10 @@ public class ASTMResultParser {
                             ? null
                             : flagOf(line.split(Pattern.quote(FIELD_DELIMITER), -1), parts, reading);
                     if (flag != null) {
-                        if (flag.raised() && accession != null) {
-                            sampleFlags.add(new SampleFlag(flag.code(), flag.name(), flag.value()));
+                        SampleFlag raised = new SampleFlag(flag.code(), flag.name(), flag.value());
+                        // A cartridge's control is reported under each of its tests; it is one flag on the sample.
+                        if (flag.raised() && accession != null && !sampleFlags.contains(raised)) {
+                            sampleFlags.add(raised);
                         }
                     } else if (accession != null) {
                         AnalyzerResult result = parts == null

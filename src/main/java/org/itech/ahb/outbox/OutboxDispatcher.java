@@ -234,11 +234,15 @@ public class OutboxDispatcher {
     }
   }
 
-  /** True when the bundle holds at least one Observation; an unreadable payload is left for OpenELIS to judge. */
+  /**
+   * True when the bundle holds an Observation that is a result rather than a sample flag; an
+   * unreadable payload is left for OpenELIS to judge.
+   */
   static boolean carriesAResult(String fhirJson) {
     try {
       for (JsonNode item : BUNDLE_READER.readTree(fhirJson).path("entry")) {
-        if ("Observation".equals(item.path("resource").path("resourceType").asText())) {
+        JsonNode resource = item.path("resource");
+        if ("Observation".equals(resource.path("resourceType").asText()) && !isSampleFlag(resource)) {
           return true;
         }
       }
@@ -246,6 +250,18 @@ public class OutboxDispatcher {
     } catch (JsonProcessingException unreadable) {
       return true;
     }
+  }
+
+  private static boolean isSampleFlag(JsonNode observation) {
+    for (JsonNode extension : observation.path("extension")) {
+      if (
+        extension.path("url").asText().endsWith("/analyzer-result-classification") &&
+        "SAMPLE_FLAG".equals(extension.path("valueCode").asText())
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void attempt(OutboxEntry entry) {
