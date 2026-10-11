@@ -104,7 +104,7 @@ class OutboxListenerPortTest {
     return new RenderedDelivery(
       "astm-v1:shared",
       "ACC-1",
-      "{\"resourceType\":\"Bundle\"}",
+      "{\"resourceType\":\"Bundle\",\"entry\":[{\"resource\":{\"resourceType\":\"Observation\"}}]}",
       "gx-a",
       "oe-gx-a",
       "genexpert-astm",
