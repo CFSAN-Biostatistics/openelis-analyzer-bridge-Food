@@ -122,11 +122,78 @@ public class NormalizedBundleRenderer {
     AnalyzerRuntimeRegistry.AnalyzerEntry analyzer,
     String targetUri
   ) {
+    if (envelope.getProtocol() == Protocol.HL7) {
+      List<List<String>> groups = patientResultGroups(splitOn(envelope.getRawMessage(), true));
+      if (groups.size() > 1) {
+        return renderPatientGroups(envelope, analyzer, groups, targetUri);
+      }
+    }
+    return renderSegments(
+      envelope,
+      analyzer,
+      envelope.getProtocol() == Protocol.HL7
+        ? splitOn(envelope.getRawMessage(), true)
+        : splitOn(envelope.getRawMessage(), false),
+      DeliveryIdentity.contentHash(envelope.getRawMessage()),
+      targetUri
+    );
+  }
+
+  /**
+   * An HL7 ORU may carry several patient result groups, each opened by its own PID. Each group is
+   * read on its own, behind the message's header segments, so its results keep its own patient
+   * and sample; a message with one PID is one group.
+   */
+  static List<List<String>> patientResultGroups(List<String> segments) {
+    List<String> header = new ArrayList<>();
+    List<List<String>> groups = new ArrayList<>();
+    for (String segment : segments) {
+      if (segment.startsWith("PID")) {
+        groups.add(new ArrayList<>(header));
+      }
+      (groups.isEmpty() ? header : groups.get(groups.size() - 1)).add(segment);
+    }
+    return groups.isEmpty() ? List.of(header) : groups;
+  }
+
+  private Outcome renderPatientGroups(
+    MessageEnvelope envelope,
+    AnalyzerRuntimeRegistry.AnalyzerEntry analyzer,
+    List<List<String>> groups,
+    String targetUri
+  ) {
+    List<RenderedDelivery> deliveries = new ArrayList<>();
+    for (List<String> group : groups) {
+      Outcome one = renderSegments(
+        envelope,
+        analyzer,
+        group,
+        DeliveryIdentity.contentHash(String.join("\r", group)),
+        targetUri
+      );
+      if (one instanceof Outcome.Rendered rendered) {
+        deliveries.addAll(rendered.deliveries());
+      } else if (((Outcome.Failed) one).reason() != FailureReason.PARSE_NO_RESULTS) {
+        return one;
+      }
+    }
+    return deliveries.isEmpty()
+      ? new Outcome.Failed(FailureReason.PARSE_NO_RESULTS, "HL7 parsing produced no results")
+      : new Outcome.Rendered(deliveries);
+  }
+
+  private Outcome renderSegments(
+    MessageEnvelope envelope,
+    AnalyzerRuntimeRegistry.AnalyzerEntry analyzer,
+    List<String> segments,
+    String contentHash,
+    String targetUri
+  ) {
     ControlResultRecognition recognition = analyzer.getControlResultRecognition();
     HL7ResultParser.ParsedResults parsed =
       switch (envelope.getProtocol()) {
         case HL7 -> HL7ResultParser.parse(
-          splitOn(envelope.getRawMessage(), true),
+          segments,
           recognition,
           analyzer.getHl7SpecimenPosition(),
           analyzer.getHl7ResultRecordSelection() == null
@@ -135,7 +202,7 @@ public class NormalizedBundleRenderer {
           analyzer.getResultReading()
         );
         case ASTM -> ASTMResultParser.parse(
-          splitOn(envelope.getRawMessage(), false),
+          segments,
           recognition,
           analyzer.getAstmResultRecordSelection(),
           analyzer.getResultReading()
@@ -151,7 +218,7 @@ public class NormalizedBundleRenderer {
     String messageId = DeliveryIdentity.forAccession(
       envelope.getProtocol(),
       analyzer.getBridgeConnectionId(),
-      DeliveryIdentity.contentHash(envelope.getRawMessage()),
+      contentHash,
       parsed.accessionNumber()
     );
     return renderOne(envelope, analyzer, parsed, messageId, targetUri);
