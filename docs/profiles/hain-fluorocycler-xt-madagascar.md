@@ -42,7 +42,7 @@ number, which OpenELIS holds as a code nobody has mapped.
 | values `Positive`, `Negative`, `Invalid`                                                                      | `Positive` from the workbook; `Negative` and `Invalid` from spec section 3.3 (FluoroType assays report Positive/Negative/Invalid) |
 | `Positive` LOINC LA11882-0, SNOMED 260373001, CIEL 1301; `Negative` LA11883-8, 260415000, CIEL 1302; `Invalid` LA15841-2, CIEL 163611 | the same codings `hain-fluorocycler-xt` cites for Detected, Not detected and Invalid                                           |
 | sample flag `IC`, "Internal control invalid", raised on `Invalid`                                            | rows 3 and 5 carry `Valid`; `Invalid` is the other state the spec's section 3.3 names for an internal-control failure          |
-| controls by `Type` `Positive`, `Negative`, `Standard`                                                         | `hain-fluorocycler-xt` revision 2, whose `Type` rules came from this workbook's `Type` column                                   |
+| controls by `Type` `Positive`, `Negative`, `Standard`                                                         | `hain-fluorocycler-xt`, whose `Type` rules came from this workbook's `Type` column                                   |
 
 The profile has no translations: the workbook is filled in by the lab in English.
 

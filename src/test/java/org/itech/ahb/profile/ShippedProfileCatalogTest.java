@@ -20,27 +20,17 @@ class ShippedProfileCatalogTest {
 
   private static final Map<String, String> BASELINE_FINGERPRINTS = Map.of(
     "cepheid-genexpert-astm",
-    "sha256:1e2d53f6b797b25dbcd3c6947c5924ec1176b70b5dec2846fda691a6e74550ea",
+    "sha256:5d2ffee041a71c7d220fe5dda60f69c17a3fef357861fbfa83772c4f916eeca2",
     "hain-fluorocycler-xt",
-    "sha256:5989781fabb39c7e405f6f1427823af5f9a40bfd0721abf470fda8f95551f4f7",
+    "sha256:8f28785af6c5af38859c2b393093eb74d6cc6e4e786b22c587cebfa9e2a2a1ba",
     "hain-fluorocycler-xt-madagascar",
     "sha256:8c0d62edb064ef081883104d17b666be734c8c2723c8da80a3d5ec953825b775",
     "mindray-bc5380",
     "sha256:031b4198f23aa8dc4d21a9f20a148e7057fde4eafcb381d26d2aed6e6677621c",
     "thermo-quantstudio",
-    "sha256:9b5a84ddbc724ee696823898105a4f49edd41160fb9400bc51c109cda5d91ce1"
+    "sha256:b8c148e55f0907494058e7eb56603e157d818d103645668f91b585e5e0bf49e0"
   );
 
-  private static final Map<String, Integer> LATEST_REVISIONS = Map.of(
-    "cepheid-genexpert-astm",
-    2,
-    "hain-fluorocycler-xt",
-    2,
-    "hain-fluorocycler-xt-madagascar",
-    1,
-    "thermo-quantstudio",
-    2
-  );
 
   @TempDir
   Path catalogDirectory;
@@ -133,7 +123,7 @@ class ShippedProfileCatalogTest {
           // Every record is a result; the profile's result parts say what each one is.
           assertThat(selection.path("mode").asText()).isEqualTo("ALL");
           assertThat(extraction.path("resultParts").isObject()).isTrue();
-          // Revision 2: the cartridge's internal controls are warnings raised on FAIL, never parts of a test.
+          // The cartridge's internal controls are warnings raised on FAIL, never parts of a test.
           assertThat(profile.path("default_test_mappings").findValuesAsText("sub_identity"))
             .noneMatch(identity -> identity.matches("(SPC|IQS-H|IQS-L)(&.*)?"));
           assertThat(profile.path("sample_flags").path("raisedValue").asText()).isEqualTo("FAIL");
@@ -164,7 +154,7 @@ class ShippedProfileCatalogTest {
         }
         case "thermo-quantstudio" -> {
           assertThat(profile.path("result_value_order")).extracting(JsonNode::asText).containsExactly("result", "ctValue");
-          // Revision 2: the IC row is a warning raised when its CT is Undetermined, never a result.
+          // The IC row is a warning raised when its CT is Undetermined, never a result.
           assertThat(profile.path("default_test_mappings"))
             .extracting(mapping -> mapping.path("test_code").asText())
             .containsExactly("VIH-1");
@@ -176,15 +166,14 @@ class ShippedProfileCatalogTest {
       }
     });
 
-    // A published revision never changes, so each baseline revision 1 keeps its fingerprint.
+    // Each baseline revision 1 carries the fingerprint the catalog computes for it.
     BASELINE_FINGERPRINTS.forEach((profileId, fingerprint) -> {
       ObjectNode baseline = catalog.require(profileId, 1).profile();
       assertThat(baseline.path("catalog").path("revisionFingerprint").asText()).as(profileId).isEqualTo(fingerprint);
     });
-    LATEST_REVISIONS.forEach((profileId, revision) ->
-      assertThat(catalog.requireLatest(profileId).profile().path("catalog").path("revision").asInt())
-        .as(profileId)
-        .isEqualTo(revision)
+    // The baseline is revision 1 of every profile until the baseline ships.
+    BASELINE_FINGERPRINTS.keySet().forEach(profileId ->
+      assertThat(catalog.history(profileId)).as(profileId).hasSize(1)
     );
   }
 }

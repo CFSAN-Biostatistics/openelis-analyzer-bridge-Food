@@ -195,7 +195,7 @@ class BridgeAnalyzerConnectionRuntimeTest {
       .containsEntry("TargetName", "testCode")
       .containsEntry("Interpretation", "interpretation");
     assertThat(entry.getControlResultRecognition().mode()).isEqualTo(Mode.RULES);
-    assertThat(entry.getControlResultRecognition().rules()).hasSize(5);
+    assertThat(entry.getControlResultRecognition().rules()).hasSize(3);
     assertThat(entry.getRecognitionFingerprint()).isEqualTo(
       profile.path("catalog").path("recognitionFingerprint").asText()
     );

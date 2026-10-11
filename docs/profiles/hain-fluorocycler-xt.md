@@ -38,15 +38,24 @@ workbook of its own shape (`Row`, `Col`, `Sample ID`, `Type`, `Calc. Conc.`, `Re
 detection channel), which `hain-fluorocycler-xt-madagascar` describes; see its evidence page. A lab
 picks the profile whose columns match its workbook.
 
-## Revision 2: control recognition
+## Control recognition
 
-`src/main/resources/analyzer-profiles/hain-fluorocycler-xt-v2.json` changes only `controlResultRecognition`.
-
-- It keeps the `Type` rules (`Positive`, `Negative`, `Standard`). The Madagascar site file has a
-  `Type` column, with `Unknown` on patient rows (DIGI-UW/analyzer-mock-server commit 835261c, which
-  took the column shape from that file).
-- It drops revision 1's `C+` and `C-` Sample ID prefixes, which no document or site file uses.
+- A row whose `Type` is `Positive`, `Negative` or `Standard` is a control. The Madagascar site file
+  has a `Type` column, with `Unknown` on patient rows (DIGI-UW/analyzer-mock-server commit 835261c,
+  which took the column shape from that file).
+- No Sample ID prefix marks a control: no document or site file uses one.
 
 Not verified: the value a control row carries in `Type`. No file we have includes a control, and
 no Bruker document describes the export. One site run with a positive and a negative control
-settles it; until then the operands stay as revision 1 had them.
+settles it.
+
+## Record kinds
+
+What the template carries, by kind (OpenELIS analyzer spec, rule 11), and the section that declares it:
+
+| Kind                        | Records                                                      | Declared in                |
+| --------------------------- | ------------------------------------------------------------ | -------------------------- |
+| result for an ordered test  | the `VIH-1` row: its concentration and its call              | `default_test_mappings`    |
+| value on a control material | a row whose `Type` is `Positive`, `Negative` or `Standard`   | `controlResultRecognition` |
+| warning about the sample    | none declared: the template's other targets are per-analyzer | none                       |
+| not received                | none                                                         |                            |

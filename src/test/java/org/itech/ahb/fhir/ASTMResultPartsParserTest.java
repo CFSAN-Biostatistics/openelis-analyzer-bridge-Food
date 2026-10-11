@@ -53,20 +53,10 @@ class ASTMResultPartsParserTest {
     );
 
     assertThat(parsed.accessionNumber()).isEqualTo("HIV-1 30cp");
-    // A record with neither a call nor a number says nothing, so it is not a result.
-    assertThat(subIdentities(parsed)).containsExactly(
-      "",
-      "HIV-1",
-      "HIV-1&Ct",
-      "HIV-1&EndPt",
-      "HIV-1&Delta Ct",
-      "IQS-H",
-      "IQS-H&Ct",
-      "IQS-H&EndPt",
-      "IQS-L",
-      "IQS-L&Ct",
-      "IQS-L&EndPt"
-    );
+    // A record with neither a call nor a number says nothing, so it is not a result; the internal
+    // quantitation standards are flags on the sample, and a passing one raises none.
+    assertThat(subIdentities(parsed)).containsExactly("", "HIV-1", "HIV-1&Ct", "HIV-1&EndPt", "HIV-1&Delta Ct");
+    assertThat(parsed.sampleFlags()).isEmpty();
     RecordParts main = parsed.results().get(0).parts();
     assertThat(parsed.results().get(0).testCode()).isEqualTo("HIVVL");
     assertThat(main.call()).isEqualTo("DETECTED");
@@ -153,7 +143,9 @@ class ASTMResultPartsParserTest {
     );
 
     List<AnalyzerResult> results = parsed.results();
-    assertThat(subIdentities(parsed)).containsExactly("", "HIV-1", "HIV-1&Ct", "IQS-H");
+    // The internal standard is a flag on the sample, raised only on FAIL, so NO RESULT raises none.
+    assertThat(subIdentities(parsed)).containsExactly("", "HIV-1", "HIV-1&Ct");
+    assertThat(parsed.sampleFlags()).isEmpty();
     RecordParts main = results.get(0).parts();
     assertThat(main.call()).isEqualTo("ERROR");
     assertThat(main.runFailed()).isTrue();
@@ -164,7 +156,6 @@ class ASTMResultPartsParserTest {
     assertThat(results.get(1).parts().runFailed()).isTrue();
     assertThat(results.get(2).parts().runFailed()).isFalse();
     assertThat(results.get(2).parts().number()).isEqualTo("0.0");
-    assertThat(results.get(3).parts().runFailed()).isTrue();
   }
 
   @Test
