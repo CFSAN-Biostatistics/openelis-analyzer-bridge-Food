@@ -41,16 +41,24 @@ number, which OpenELIS holds as a code nobody has mapped.
 | test `VIH-1`, LOINC 20447-9, unit copies/mL, quantitative, with a call                                        | rows 2 and 4 (`Calc. Conc.` is the number, `Result` the call)                                                                  |
 | values `Positive`, `Negative`, `Invalid`                                                                      | `Positive` from the workbook; `Negative` and `Invalid` from spec section 3.3 (FluoroType assays report Positive/Negative/Invalid) |
 | `Positive` LOINC LA11882-0, SNOMED 260373001, CIEL 1301; `Negative` LA11883-8, 260415000, CIEL 1302; `Invalid` LA15841-2, CIEL 163611 | the same codings `hain-fluorocycler-xt` cites for Detected, Not detected and Invalid                                           |
-| test `IC`, qualitative, values `Valid`, `Invalid`                                                             | rows 3 and 5; `Invalid` is the other state the spec's section 3.3 names for an internal-control failure                        |
-| `IC` LOINC 89578-3                                                                                            | the LOINC the QuantStudio profile cites for its internal control (QuantStudio spec section 4.3); no document names one for this workbook |
+| sample flag `IC`, "Internal control invalid", raised on `Invalid`                                            | rows 3 and 5 carry `Valid`; `Invalid` is the other state the spec's section 3.3 names for an internal-control failure          |
 | controls by `Type` `Positive`, `Negative`, `Standard`                                                         | `hain-fluorocycler-xt` revision 2, whose `Type` rules came from this workbook's `Type` column                                   |
 
 The profile has no translations: the workbook is filled in by the lab in English.
+
+## Record kinds
+
+What the workbook carries, by kind (OpenELIS analyzer spec, rule 11), and the section that declares it:
+
+| Kind                        | Records                                                    | Declared in                                     |
+| --------------------------- | ---------------------------------------------------------- | ----------------------------------------------- |
+| result for an ordered test  | the channel 1 row: `VIH-1`, its concentration and its call | `default_test_mappings`                         |
+| value on a control material | a row whose `Type` is `Positive`, `Negative` or `Standard` | `controlResultRecognition`                      |
+| warning about the sample    | the channel 2 row: the internal control, raised on Invalid | `sample_flags`                                  |
+| not received                | none                                                       |                                                 |
 
 ## Not verified
 
 - The site workbook itself: only the mock's copy of its shape and values has been seen. A row from
   the lab with a negative sample, a failed internal control, or a control settles `Negative`,
   `Invalid` and the `Type` values.
-- Whether a lab records the internal control's validity as a result: OpenELIS maps `IC` to a test
-  of its own or marks it Do not receive on the analyzer's mapping page.

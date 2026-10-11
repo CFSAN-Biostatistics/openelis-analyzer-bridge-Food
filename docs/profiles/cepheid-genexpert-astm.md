@@ -108,6 +108,22 @@ the vendor's sub-ID notation (`HIV-1&Ct`, `&LOG`, empty for the main result). An
 (`DETECTED` with flag `<` and range `40.00 to 10000000.00`) arrives as a quantity of the limit
 with its comparator (rules 11 and 17).
 
+## Revision 2: the cartridge's internal controls
+
+`src/main/resources/analyzer-profiles/cepheid-genexpert-astm-v2.json` reads the cartridge's own
+checks as warnings about the sample, not parts of a test: the sample processing control (`SPC`, on
+each respiratory test) and the internal quantitation standards (`IQS-H` and `IQS-L`, on HIV-1 viral
+load), each with its `Ct` and `EndPt`, are declared under `sample_flags` and raised on `FAIL`. Their
+values are the ones revision 1 declared (303-0251 2.1.1; 303-3083 section 3). A control the
+cartridge reports under each of its tests is one flag on the sample. Everything else is unchanged.
+
+| Kind                        | Records                                                                                         | Declared in                                                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| result for an ordered test  | the assay's result with its call, and its analyte and complement records other than the controls | `default_test_mappings`, read by `resultParts`; `resultRecordSelection` ALL |
+| value on a control material | a run whose specimen the recognition rules name as a control                                    | `controlResultRecognition`                                                  |
+| warning about the sample    | `SPC`, `IQS-H`, `IQS-L` and their `Ct` and `EndPt`, raised on `FAIL`                            | `sample_flags`                                                              |
+| not received                | none                                                                                            |                                                                             |
+
 ## Discrepancies in the vendor documents
 
 - 301-2002 section 6.3.4.1 says analyte results, Ct, EndPt and Delta Ct are not uploaded. The 2021

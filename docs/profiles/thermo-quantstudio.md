@@ -27,9 +27,20 @@ Revision 4 changes the contract only: each test now cites its source. The values
   check a site's configuration and do not define a profile (rule 19).
 - LOINC 89578-3 is the standard code for internal control DNA; the spec does not give a LOINC.
 
-## Revision 2: control recognition
+## Revision 2: control recognition and the internal control
 
-`src/main/resources/analyzer-profiles/thermo-quantstudio-v2.json` changes only `controlResultRecognition`.
+`src/main/resources/analyzer-profiles/thermo-quantstudio-v2.json` changes `controlResultRecognition`
+and reads the `IC` row as a warning about the sample, not a test: `IC` is declared under
+`sample_flags` as "Internal control not detected", raised when its `CT` is `Undetermined` (section
+8; the internal control matters for a negative sample, and its failure calls for review, not a
+result).
+
+| Kind                        | Records                                                        | Declared in                |
+| --------------------------- | -------------------------------------------------------------- | -------------------------- |
+| result for an ordered test  | the `VIH-1` row of each patient well                           | `default_test_mappings`    |
+| value on a control material | standards, NTC wells and the positive control, by the rules below | `controlResultRecognition` |
+| warning about the sample    | the `IC` row of each well, raised on `Undetermined`            | `sample_flags`             |
+| not received                | none                                                           |                            |
 
 | Rule                                                                         | Defined in                                                                                                                                    |
 | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
