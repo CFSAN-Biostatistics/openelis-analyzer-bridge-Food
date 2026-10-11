@@ -20,6 +20,18 @@ profile, which the Bridge no longer ships, and is not a later revision of it (ru
 The example messages in 303-0251 section 2.1.1 and 302-7279 section 6 are in
 `src/test/resources/cepheid-examples/`; `GeneXpertBaselineProfileTest` replays all of them.
 
+## Record kinds
+
+What the instrument sends, by kind (OpenELIS analyzer spec, rule 11), and the section that
+declares it:
+
+| Kind                               | Records                                                                                                   | Declared in                                                                 |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| result for an ordered test         | every R record: the assay's result with its call, and the analyte and complement records as its parts    | `default_test_mappings`, read by `resultParts`; `resultRecordSelection` ALL |
+| value on a control material        | a run whose specimen the recognition rules name as a control                                              | `controlResultRecognition`                                                  |
+| warning about the sample           | none: the instrument reports a failed run as a result value (`ERROR`, `NO RESULT`, `INVALID`), not a flag | `run_failure_values` on each test                                           |
+| not received                       | none                                                                                                      |                                                                             |
+
 ## Tests
 
 The codes are Cepheid's suggested host test and result codes. They are user-defined on each

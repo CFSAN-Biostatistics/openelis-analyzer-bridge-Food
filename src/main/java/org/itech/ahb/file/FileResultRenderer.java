@@ -81,7 +81,7 @@ public final class FileResultRenderer {
       snapshot.setRecognitionFingerprint(context.recognitionFingerprint());
       snapshot.setCodeToLoinc(context.codeToLoinc());
       snapshot.setResultReading(
-        new ResultReading(null, null, '.', Map.of(), context.profileCodeByInstrumentCode(), null)
+        new ResultReading(null, null, '.', Map.of(), context.profileCodeByInstrumentCode(), context.sampleFlags())
       );
       List<RenderedDelivery> deliveries = new ArrayList<>();
       for (var accession : parsed) {
@@ -126,9 +126,9 @@ public final class FileResultRenderer {
       analyzerEntry.getControlResultRecognition(),
       analyzerEntry.getRecognitionFingerprint()
     );
+    ResultReading reading = analyzerEntry.getResultReading();
     return FhirBundleBuilder.buildNormalizedBundle(
-      parsed.accessionNumber(),
-      parsed.underProfileCodes(analyzerEntry.getResultReading()).results(),
+      parsed.underProfileCodes(reading).withFileSampleFlags(reading == null ? null : reading.sampleFlags()),
       context,
       analyzerEntry::getLoincForProfileCode,
       FileDeliveryIdentity.forAccession(analyzerEntry.getBridgeConnectionId(), contentHash, parsed.accessionNumber())

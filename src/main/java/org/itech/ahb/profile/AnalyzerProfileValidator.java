@@ -67,6 +67,7 @@ final class AnalyzerProfileValidator {
       validateFilePattern(profile, failures);
       validateTabularResultSelection(profile, failures);
       validateTestCodeValues(profile, failures);
+      validateRecordKinds(profile, failures);
       validateMappingIdentities(profile, failures);
       validateResultDescriptions(profile, failures);
       validateRecognitionPatterns(profile, failures);
@@ -160,6 +161,7 @@ final class AnalyzerProfileValidator {
       });
   }
 
+  /** A FILE column value the profile translates must name a declared test or a sample flag. */
   private void validateTestCodeValues(JsonNode profile, List<String> failures) {
     JsonNode values = profile.path("test_code_values");
     if (!"FILE".equals(profile.path("protocol").path("name").asText()) || values.isMissingNode()) {
@@ -174,6 +176,7 @@ final class AnalyzerProfileValidator {
     }
     Set<String> declared = new HashSet<>();
     profile.path("default_test_mappings").forEach(mapping -> declared.add(mapping.path("test_code").asText()));
+    profile.path("sample_flags").path("codes").forEach(code -> declared.add(code.asText()));
     values
       .fields()
       .forEachRemaining(entry -> {
@@ -183,10 +186,63 @@ final class AnalyzerProfileValidator {
             entry.getKey() +
             " names " +
             entry.getValue().asText() +
-            ", which $.default_test_mappings does not declare"
+            ", which neither $.default_test_mappings nor $.sample_flags declares"
           );
         }
       });
+  }
+
+  /**
+   * What an instrument sends is of one kind each: a result the profile declares as a test, a
+   * warning about the sample ($.sample_flags), or a record it does not receive
+   * (resultRecordSelection EXCLUDE). No code may be two of these.
+   */
+  private void validateRecordKinds(JsonNode profile, List<String> failures) {
+    Set<String> tests = new LinkedHashSet<>();
+    profile.path("default_test_mappings").forEach(mapping -> tests.add(mapping.path("test_code").asText()));
+    JsonNode flags = profile.path("sample_flags");
+    Set<String> flagCodes = new LinkedHashSet<>();
+    flags.path("codes").forEach(code -> flagCodes.add(code.asText()));
+    Set<String> excluded = new LinkedHashSet<>();
+    JsonNode selection = profile.path("configDefaults").path("extractionOverrides").path("resultRecordSelection");
+    if ("EXCLUDE".equals(selection.path("mode").asText())) {
+      selection.path("values").forEach(value -> excluded.add(value.asText()));
+    }
+    for (String code : flagCodes) {
+      if (tests.contains(code)) {
+        failures.add("$.sample_flags.codes lists " + code + ", which $.default_test_mappings declares as a test");
+      }
+      if (excluded.contains(code)) {
+        failures.add("$.sample_flags.codes lists " + code + ", which resultRecordSelection does not receive");
+      }
+    }
+    for (String code : tests) {
+      if (excluded.contains(code)) {
+        failures.add("$.default_test_mappings declares " + code + ", which resultRecordSelection does not receive");
+      }
+    }
+    if (flags.isObject()) {
+      for (JsonNode name : flags.path("names")) {
+        if (name.asText().isBlank()) {
+          failures.add("$.sample_flags.names gives a blank name");
+        }
+      }
+      flags
+        .path("names")
+        .fieldNames()
+        .forEachRemaining(code -> {
+          if (!flagCodes.contains(code)) {
+            failures.add("$.sample_flags.names names " + code + ", which $.sample_flags.codes does not list");
+          }
+        });
+      if ("FILE".equals(profile.path("protocol").path("name").asText())) {
+        for (String code : flagCodes) {
+          if (!flags.path("names").has(code)) {
+            failures.add("$.sample_flags.names must name " + code + ": a file carries no name for a flag");
+          }
+        }
+      }
+    }
   }
 
   private void validateFilePattern(JsonNode profile, List<String> failures) {

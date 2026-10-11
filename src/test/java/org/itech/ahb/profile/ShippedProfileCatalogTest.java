@@ -24,9 +24,9 @@ class ShippedProfileCatalogTest {
     "hain-fluorocycler-xt",
     "sha256:5989781fabb39c7e405f6f1427823af5f9a40bfd0721abf470fda8f95551f4f7",
     "hain-fluorocycler-xt-madagascar",
-    "sha256:630b4c76fce3b62529bace793708be2024cfcb1be22c88cdc3698ac72212d212",
+    "sha256:8c0d62edb064ef081883104d17b666be734c8c2723c8da80a3d5ec953825b775",
     "mindray-bc5380",
-    "sha256:b1e182b5fdd68215e2e5c57aa988615968ff8eb1fed1fe58a9b0364c60a6c7a8",
+    "sha256:031b4198f23aa8dc4d21a9f20a148e7057fde4eafcb381d26d2aed6e6677621c",
     "thermo-quantstudio",
     "sha256:9b5a84ddbc724ee696823898105a4f49edd41160fb9400bc51c109cda5d91ce1"
   );
@@ -142,6 +142,12 @@ class ShippedProfileCatalogTest {
           assertThat(profile.path("column_mapping").path("Col").asText()).isEqualTo("testCode");
           assertThat(profile.path("test_code_values").path("1").asText()).isEqualTo("VIH-1");
           assertThat(profile.path("test_code_values").path("2").asText()).isEqualTo("IC");
+          // The internal control's validity is a warning about the sample, never a result.
+          assertThat(profile.path("default_test_mappings"))
+            .extracting(mapping -> mapping.path("test_code").asText())
+            .containsExactly("VIH-1");
+          assertThat(profile.path("sample_flags").path("raisedValue").asText()).isEqualTo("Invalid");
+          assertThat(profile.path("sample_flags").path("names").path("IC").asText()).isEqualTo("Internal control invalid");
         }
         case "mindray-bc5380" -> {
           JsonNode extraction = profile.path("configDefaults").path("extractionOverrides");
@@ -149,9 +155,16 @@ class ShippedProfileCatalogTest {
           assertThat(extraction.path("resultRecordSelection").path("mode").asText()).isEqualTo("EXCLUDE");
           assertThat(extraction.path("resultParts").isObject()).isTrue();
         }
-        case "thermo-quantstudio" -> assertThat(profile.path("result_value_order"))
-          .extracting(JsonNode::asText)
-          .containsExactly("result", "ctValue");
+        case "thermo-quantstudio" -> {
+          assertThat(profile.path("result_value_order")).extracting(JsonNode::asText).containsExactly("result", "ctValue");
+          // Revision 2: the IC row is a warning raised when its CT is Undetermined, never a result.
+          assertThat(profile.path("default_test_mappings"))
+            .extracting(mapping -> mapping.path("test_code").asText())
+            .containsExactly("VIH-1");
+          assertThat(profile.path("sample_flags").path("raisedValue").asText()).isEqualTo("Undetermined");
+          assertThat(profile.path("sample_flags").path("names").path("IC").asText())
+            .isEqualTo("Internal control not detected");
+        }
         default -> throw new AssertionError("Unexpected priority profile");
       }
     });

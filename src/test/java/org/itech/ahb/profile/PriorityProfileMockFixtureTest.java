@@ -59,6 +59,8 @@ class PriorityProfileMockFixtureTest {
     Set<String> parsedCodes = new LinkedHashSet<>();
     List<String> unresolved = new java.util.ArrayList<>();
     int parsedResultCount;
+    int flagRowCount;
+    int raisedFlagCount;
     try (InputStream input = Files.newInputStream(fixturePath)) {
       var parsed = FileResultParser.parse(
         input,
@@ -69,7 +71,12 @@ class PriorityProfileMockFixtureTest {
         TabularResultValueSelection.fromProfile(profile),
         testCodeValues
       );
+      int rowCount = parsed.stream().mapToInt(results -> results.results().size()).sum();
+      SampleFlags flags = SampleFlags.fromProfile(profile);
+      parsed = parsed.stream().map(results -> results.withFileSampleFlags(flags)).toList();
       parsedResultCount = parsed.stream().mapToInt(results -> results.results().size()).sum();
+      flagRowCount = rowCount - parsedResultCount;
+      raisedFlagCount = parsed.stream().mapToInt(results -> results.sampleFlags().size()).sum();
       parsed.forEach(results ->
         results
           .results()
@@ -110,7 +117,9 @@ class PriorityProfileMockFixtureTest {
         .isTrue();
       softly.assertThat(parsedCodes).containsExactlyInAnyOrderElementsOf(mappingCodes(profile));
       softly.assertThat(unresolved).as("every row resolves to a declared test and value").isEmpty();
-      softly.assertThat(parsedResultCount).as("every mock FILE result row is preserved").isEqualTo(4);
+      softly.assertThat(parsedResultCount).as("one result row per sample").isEqualTo(2);
+      softly.assertThat(flagRowCount).as("the internal-control row of each sample is a flag row").isEqualTo(2);
+      softly.assertThat(raisedFlagCount).as("a valid internal control raises nothing").isZero();
     });
   }
 

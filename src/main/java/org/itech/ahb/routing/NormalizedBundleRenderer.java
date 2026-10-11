@@ -17,6 +17,7 @@ import org.itech.ahb.outbox.DeliveryIdentity;
 import org.itech.ahb.outbox.FailureReason;
 import org.itech.ahb.outbox.RenderedDelivery;
 import org.itech.ahb.profile.ControlResultRecognition;
+import org.itech.ahb.profile.ResultReading;
 import org.springframework.stereotype.Component;
 
 /**
@@ -229,9 +230,15 @@ public class NormalizedBundleRenderer {
       analyzer.getControlResultRecognition(),
       analyzer.getRecognitionFingerprint()
     );
+    ResultReading reading = analyzer.getResultReading();
+    HL7ResultParser.ParsedResults sorted = parsed.underProfileCodes(reading);
+    if (envelope.getProtocol() == Protocol.CSV && reading != null) {
+      // A socket parser sorts flag records out as it reads; a tabular file's rows are sorted here.
+      sorted = sorted.withFileSampleFlags(reading.sampleFlags());
+    }
     try {
       String fhirJson = FhirBundleBuilder.buildNormalizedBundle(
-        parsed.underProfileCodes(analyzer.getResultReading()),
+        sorted,
         analyzerContext,
         analyzer::getLoincForProfileCode,
         messageId

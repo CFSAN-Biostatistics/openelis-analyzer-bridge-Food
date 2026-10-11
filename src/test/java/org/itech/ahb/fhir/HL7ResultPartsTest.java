@@ -168,10 +168,7 @@ class HL7ResultPartsTest {
     profile.putObject("protocol").put("name", "HL7");
     ObjectNode overrides = profile.putObject("configDefaults").putObject("extractionOverrides");
     PARTS.forEach(overrides.putObject("resultParts")::put);
-    ObjectNode flags = overrides.putObject("sampleFlags");
-    flags.put("codeField", "OBX.3.1");
-    flags.put("nameField", "OBX.3.2");
-    flags.put("valueField", "OBX.5");
+    ObjectNode flags = profile.putObject("sample_flags");
     flags.put("raisedValue", "T");
     Arrays.stream(codes).forEach(flags.putArray("codes")::add);
     return ResultReading.fromProfile(profile);

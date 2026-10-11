@@ -17,6 +17,19 @@ message, and C.5 the coding of OBR-4 (Table 9), of each OBX (Table 10) and the u
 The two example messages are in `src/test/resources/mindray-examples/`, wrapped lines joined and
 page breaks removed; `MindrayBc5380BaselineProfileTest` replays both.
 
+## Record kinds
+
+What the instrument sends, by kind (OpenELIS analyzer spec, rule 11), and the section that
+declares it:
+
+| Kind                               | Records                                                                                                       | Declared in                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| result for an ordered test         | the CBC parameters of Table 10 (the "Tests" section below), one OBX each                                      | `default_test_mappings`, read by `resultParts`                     |
+| value on a control material        | a QC message (C.3.3, XR QC), whose sample the recognition rules name as a control                             | `controlResultRecognition`                                         |
+| warning about the sample           | the alarms of Table 10's "Abnormal alarm information", `T` when raised (the "Alarms" section below)          | `sample_flags`                                                     |
+| not received                       | the instrument's settings and the histogram segments (the "Records that are not results" section below)     | `resultRecordSelection` EXCLUDE                                    |
+| declared by the instrument only    | the microscope exam's differential, which the profile does not declare: OpenELIS holds it until the lab maps or excludes it (the "Microscope exam" section below) | nothing; by design |
+
 ## Tests
 
 The profile declares the analysis results of Table 10, the parameters the analyzer measures. Each
@@ -94,7 +107,7 @@ C.3.3 message sends every manual percentage as 0.0, which no counted differentia
 
 ## Alarms
 
-The sample flags are Table 10's "Abnormal alarm information": the Mindray codes 12000 to 12018 and
+`sample_flags` lists Table 10's "Abnormal alarm information": the Mindray codes 12000 to 12018 and
 the LOINC-coded alarms 17790-7 (Left Shift?), 34165-1 (Immature Granulocyte?), 15192-8
 (Abnormal/Atypical Lymphocyte?), 34525-6 (RBC Lyse Resist?), 15150-6 (Anisocytosis), 15198-5
 (Macrocytosis), 15199-3 (Microcytosis), 10379-6 (Dimorphologic), 15180-3 (Hypochromia) and 7796-6
