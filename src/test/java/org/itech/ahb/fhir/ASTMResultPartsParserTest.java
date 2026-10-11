@@ -255,6 +255,34 @@ class ASTMResultPartsParserTest {
     assertThat(parsed.sampleFlags()).containsExactly(new SampleFlag("LIPEMIA", "Lipemic sample", "T"));
   }
 
+  @Test
+  void anInternalControlPartTheProfileNamesIsAFlagOnTheSampleAndNeverAResult() throws Exception {
+    ObjectNode profile = BaselineProfileFixtures.genexpertHivViralLoad(new ObjectMapper());
+    ObjectNode flags = profile.putObject("sample_flags");
+    flags.put("raisedValue", "FAIL");
+    flags.putArray("codes").add("IQS-H").add("IQS-H&Ct").add("IQS-L").add("IQS-L&Ct");
+    flags.putObject("names").put("IQS-H", "High internal quantitation standard failed");
+
+    ParsedResults parsed = ASTMResultParser.parseRaw(
+      header() +
+      "O|1|ACC-1||^^^HIVVL|R|20221115035816|||||||||ORH||||||||||F\r" +
+      main("NOT DETECTED^", "40.00 to 10000000.00", "A") +
+      "R|7|^^^HIVVL^^^IQS-H^|FAIL^|||\r" +
+      "R|8|^^^HIVVL^^^IQS-H^Ct|^31.2|||\r" +
+      "R|9|^^^HIVVL^^^IQS-L^|PASS^|||\r" +
+      "R|10|^^^HIVVL^^^IQS-L^Ct|^29.3|||\r" +
+      "L|1|N\r",
+      ControlResultRecognition.none(),
+      AstmResultRecordSelection.all(),
+      ResultReading.fromProfile(profile)
+    );
+
+    assertThat(subIdentities(parsed)).doesNotContain("IQS-H", "IQS-H&Ct", "IQS-L", "IQS-L&Ct");
+    assertThat(parsed.sampleFlags()).containsExactly(
+      new SampleFlag("IQS-H", "High internal quantitation standard failed", "FAIL")
+    );
+  }
+
   private static ParsedResults parse(String message) {
     ParsedResults parsed = ASTMResultParser.parseRaw(
       message,

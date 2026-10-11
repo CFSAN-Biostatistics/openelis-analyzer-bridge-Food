@@ -257,14 +257,22 @@ public class ASTMResultParser {
      * Extract segment type identifier.
      * Ported from GenericASTMLineInserter.getSegmentType().
      */
-    /** The flag an R record carries: its code, the name beside the code, and its call or number. */
+    /**
+     * The flag an R record carries: its code, the name beside the code, and its call or number. A
+     * part of a test (a cartridge's internal control) is named by its identity within the test, as
+     * the profile's parts name it; any other record by its test code.
+     */
     private static SampleFlags.Reported flagOf(String[] fields, AstmResultParts parts, ResultReading reading) {
         String value = AstmResultParts.read(parts.call(), fields);
         if (value.isEmpty()) value = AstmResultParts.read(parts.number(), fields);
-        return reading.sampleFlags().read(
-                AstmResultParts.read(parts.testCode(), fields),
-                AstmResultParts.read(parts.assayName(), fields),
-                value);
+        String assayName = AstmResultParts.read(parts.assayName(), fields);
+        String analyte = assayName.isEmpty() ? AstmResultParts.read(parts.analyte(), fields) : "";
+        String complement = AstmResultParts.read(parts.complement(), fields);
+        String subIdentity = complement.isEmpty() ? analyte : analyte + "&" + complement;
+        SampleFlags.Reported part = subIdentity.isEmpty() ? null : reading.sampleFlags().read(subIdentity, null, value);
+        return part != null
+                ? part
+                : reading.sampleFlags().read(AstmResultParts.read(parts.testCode(), fields), assayName, value);
     }
 
     private static String getSegmentType(String line) {

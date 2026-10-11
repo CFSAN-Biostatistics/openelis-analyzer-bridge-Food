@@ -33,7 +33,7 @@ class ShippedProfileCatalogTest {
 
   private static final Map<String, Integer> LATEST_REVISIONS = Map.of(
     "cepheid-genexpert-astm",
-    1,
+    2,
     "hain-fluorocycler-xt",
     2,
     "hain-fluorocycler-xt-madagascar",
@@ -133,6 +133,13 @@ class ShippedProfileCatalogTest {
           // Every record is a result; the profile's result parts say what each one is.
           assertThat(selection.path("mode").asText()).isEqualTo("ALL");
           assertThat(extraction.path("resultParts").isObject()).isTrue();
+          // Revision 2: the cartridge's internal controls are warnings raised on FAIL, never parts of a test.
+          assertThat(profile.path("default_test_mappings").findValuesAsText("sub_identity"))
+            .noneMatch(identity -> identity.matches("(SPC|IQS-H|IQS-L)(&.*)?"));
+          assertThat(profile.path("sample_flags").path("raisedValue").asText()).isEqualTo("FAIL");
+          assertThat(profile.path("sample_flags").path("codes"))
+            .extracting(JsonNode::asText)
+            .contains("SPC", "SPC&Ct", "IQS-H", "IQS-L&EndPt");
         }
         case "hain-fluorocycler-xt-madagascar" -> {
           assertThat(profile.path("result_value_order"))
