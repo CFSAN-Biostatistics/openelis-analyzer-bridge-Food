@@ -42,7 +42,8 @@ public final class FileResultRenderer {
             context.selectedTestCode(),
             context.recognition(),
             context.layout(),
-            context.resultSelection()
+            context.resultSelection(),
+            context.testCodeValues()
           );
           case ".xls", ".xlsx" -> FileResultParser.parse(
             input,
@@ -50,7 +51,8 @@ public final class FileResultRenderer {
             context.selectedTestCode(),
             context.recognition(),
             context.layout(),
-            context.resultSelection()
+            context.resultSelection(),
+            context.testCodeValues()
           );
           case ".ods" -> FileResultParser.parseOds(
             input,
@@ -58,7 +60,8 @@ public final class FileResultRenderer {
             context.selectedTestCode(),
             context.recognition(),
             context.layout(),
-            context.resultSelection()
+            context.resultSelection(),
+            context.testCodeValues()
           );
           default -> throw new IllegalArgumentException("Unsupported retained FILE extension: " + context.extension());
         };

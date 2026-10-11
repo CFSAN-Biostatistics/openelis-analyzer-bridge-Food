@@ -31,6 +31,13 @@ specimen type hint (rule 1).
   describes them as examples, not a fixed menu, so a lab adds them as per-analyzer rows.
 - Any Bruker document defining the file: none exists, since the file is hand-prepared.
 
+## Another workbook, another profile
+
+This profile reads the template the spec proposes (section 3). The Madagascar site keeps a
+workbook of its own shape (`Row`, `Col`, `Sample ID`, `Type`, `Calc. Conc.`, `Result`, one row per
+detection channel), which `hain-fluorocycler-xt-madagascar` describes; see its evidence page. A lab
+picks the profile whose columns match its workbook.
+
 ## Revision 2: control recognition
 
 `src/main/resources/analyzer-profiles/hain-fluorocycler-xt-v2.json` changes only `controlResultRecognition`.

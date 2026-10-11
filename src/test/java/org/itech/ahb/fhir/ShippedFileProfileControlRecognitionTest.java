@@ -75,6 +75,14 @@ class ShippedFileProfileControlRecognitionTest {
         .isTrue();
   }
 
+  @ParameterizedTest(name = "Madagascar workbook Type {1} is a control")
+  @CsvSource({"CTRL-A, Positive", "CTRL-B, Negative", "CAL-1, Standard"})
+  void madagascarWorkbookControls(String sampleId, String type) throws Exception {
+    assertThat(
+        FileResultParser.isControlRow(sampleId, type, latestRecognition("hain-fluorocycler-xt-madagascar")))
+        .isTrue();
+  }
+
   @Test
   @DisplayName("FluoroCycler: a patient row, and an unsourced C+ prefix, are patient results")
   void fluoroCyclerPatients() throws Exception {

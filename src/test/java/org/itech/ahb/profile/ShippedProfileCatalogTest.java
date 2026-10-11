@@ -23,6 +23,8 @@ class ShippedProfileCatalogTest {
     "sha256:1e2d53f6b797b25dbcd3c6947c5924ec1176b70b5dec2846fda691a6e74550ea",
     "hain-fluorocycler-xt",
     "sha256:5989781fabb39c7e405f6f1427823af5f9a40bfd0721abf470fda8f95551f4f7",
+    "hain-fluorocycler-xt-madagascar",
+    "sha256:630b4c76fce3b62529bace793708be2024cfcb1be22c88cdc3698ac72212d212",
     "thermo-quantstudio",
     "sha256:9b5a84ddbc724ee696823898105a4f49edd41160fb9400bc51c109cda5d91ce1"
   );
@@ -32,6 +34,8 @@ class ShippedProfileCatalogTest {
     1,
     "hain-fluorocycler-xt",
     2,
+    "hain-fluorocycler-xt-madagascar",
+    1,
     "thermo-quantstudio",
     2
   );
@@ -82,7 +86,12 @@ class ShippedProfileCatalogTest {
 
     assertThat(catalog.latest())
       .extracting(revision -> revision.profile().path("profileMeta").path("id").asText())
-      .containsExactly("hain-fluorocycler-xt", "cepheid-genexpert-astm", "thermo-quantstudio");
+      .containsExactly(
+        "hain-fluorocycler-xt",
+        "hain-fluorocycler-xt-madagascar",
+        "cepheid-genexpert-astm",
+        "thermo-quantstudio"
+      );
     assertThat(catalog.latest()).allSatisfy(revision -> {
       ObjectNode profile = revision.profile();
       assertThat(profile.path("catalog").path("source").asText()).isEqualTo("SHIPPED");
@@ -121,6 +130,15 @@ class ShippedProfileCatalogTest {
           // Every record is a result; the profile's result parts say what each one is.
           assertThat(selection.path("mode").asText()).isEqualTo("ALL");
           assertThat(extraction.path("resultParts").isObject()).isTrue();
+        }
+        case "hain-fluorocycler-xt-madagascar" -> {
+          assertThat(profile.path("result_value_order"))
+            .extracting(JsonNode::asText)
+            .containsExactly("result", "interpretation");
+          // The site workbook names the channel, not the test: 1 is the target, 2 the internal control.
+          assertThat(profile.path("column_mapping").path("Col").asText()).isEqualTo("testCode");
+          assertThat(profile.path("test_code_values").path("1").asText()).isEqualTo("VIH-1");
+          assertThat(profile.path("test_code_values").path("2").asText()).isEqualTo("IC");
         }
         case "thermo-quantstudio" -> assertThat(profile.path("result_value_order"))
           .extracting(JsonNode::asText)

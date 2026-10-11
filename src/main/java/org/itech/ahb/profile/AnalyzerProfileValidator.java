@@ -66,6 +66,7 @@ final class AnalyzerProfileValidator {
       validateConnectionFields(profile, failures);
       validateFilePattern(profile, failures);
       validateTabularResultSelection(profile, failures);
+      validateTestCodeValues(profile, failures);
       validateMappingIdentities(profile, failures);
       validateResultDescriptions(profile, failures);
       validateRecognitionPatterns(profile, failures);
@@ -155,6 +156,35 @@ final class AnalyzerProfileValidator {
       .forEach(field -> {
         if (!mappedSemanticFields.contains(field)) {
           failures.add("$.result_value_order selects " + field + " but $.column_mapping has no matching source column");
+        }
+      });
+  }
+
+  private void validateTestCodeValues(JsonNode profile, List<String> failures) {
+    JsonNode values = profile.path("test_code_values");
+    if (!"FILE".equals(profile.path("protocol").path("name").asText()) || values.isMissingNode()) {
+      return;
+    }
+    boolean testCodeColumn = false;
+    for (JsonNode meaning : profile.path("column_mapping")) {
+      testCodeColumn |= "testCode".equals(meaning.asText());
+    }
+    if (!testCodeColumn) {
+      failures.add("$.test_code_values needs a column mapped to testCode in $.column_mapping");
+    }
+    Set<String> declared = new HashSet<>();
+    profile.path("default_test_mappings").forEach(mapping -> declared.add(mapping.path("test_code").asText()));
+    values
+      .fields()
+      .forEachRemaining(entry -> {
+        if (!declared.contains(entry.getValue().asText())) {
+          failures.add(
+            "$.test_code_values." +
+            entry.getKey() +
+            " names " +
+            entry.getValue().asText() +
+            ", which $.default_test_mappings does not declare"
+          );
         }
       });
   }

@@ -94,6 +94,16 @@ public class FileResultParser {
             InputStream inputStream, Map<String, String> columnMappings,
             String perFileTestCode, ControlResultRecognition recognition,
             TabularFileLayout layout, TabularResultValueSelection resultSelection) {
+        return parse(
+                inputStream, columnMappings, perFileTestCode, recognition, layout,
+                resultSelection, Map.of());
+    }
+
+    public static List<HL7ResultParser.ParsedResults> parse(
+            InputStream inputStream, Map<String, String> columnMappings,
+            String perFileTestCode, ControlResultRecognition recognition,
+            TabularFileLayout layout, TabularResultValueSelection resultSelection,
+            Map<String, String> testCodeValues) {
 
         if (inputStream == null || columnMappings == null || columnMappings.isEmpty()) {
             log.warn("FileResultParser: null input or empty column mappings");
@@ -125,7 +135,8 @@ public class FileResultParser {
                 if (row == null) continue;
 
                 String sampleId = getCellValue(row, fieldIndexes.get("sampleId"), formatter);
-                String testCode = getCellValue(row, fieldIndexes.get("testCode"), formatter);
+                String testCode = translateTestCode(
+                        getCellValue(row, fieldIndexes.get("testCode"), formatter), testCodeValues);
                 String units = getCellValue(row, fieldIndexes.get("units"), formatter);
                 String qcTask = getCellValue(row, fieldIndexes.get("qcTask"), formatter);
                 String testDate = getCellValue(row, fieldIndexes.get("testDate"), formatter);
@@ -197,6 +208,16 @@ public class FileResultParser {
             InputStream inputStream, Map<String, String> columnMappings,
             String perFileTestCode, ControlResultRecognition recognition,
             TabularFileLayout layout, TabularResultValueSelection resultSelection) {
+        return parseOds(
+                inputStream, columnMappings, perFileTestCode, recognition, layout,
+                resultSelection, Map.of());
+    }
+
+    public static List<HL7ResultParser.ParsedResults> parseOds(
+            InputStream inputStream, Map<String, String> columnMappings,
+            String perFileTestCode, ControlResultRecognition recognition,
+            TabularFileLayout layout, TabularResultValueSelection resultSelection,
+            Map<String, String> testCodeValues) {
 
         if (inputStream == null || columnMappings == null || columnMappings.isEmpty()) {
             log.warn("FileResultParser.parseOds: null input or empty column mappings");
@@ -241,7 +262,8 @@ public class FileResultParser {
             if (isRowAllEmpty(row)) continue;
 
             String sampleId = getRowValue(row, fieldIndexes.get("sampleId"));
-            String testCode = getRowValue(row, fieldIndexes.get("testCode"));
+            String testCode = translateTestCode(
+                    getRowValue(row, fieldIndexes.get("testCode")), testCodeValues);
             String qcTask = getRowValue(row, fieldIndexes.get("qcTask"));
             String units = getRowValue(row, fieldIndexes.get("units"));
 
@@ -469,6 +491,17 @@ public class FileResultParser {
                 recognition, null);
     }
 
+    /**
+     * A file names a test by what its test-code column carries; a profile may declare what
+     * those values mean (the FluoroCycler site workbook's channel number is 1 for the target
+     * and 2 for the internal control). A value the profile does not translate is kept as it
+     * is, so OpenELIS holds it as a code nobody has mapped.
+     */
+    static String translateTestCode(String raw, Map<String, String> testCodeValues) {
+        if (raw == null || testCodeValues == null || testCodeValues.isEmpty()) return raw;
+        return testCodeValues.getOrDefault(raw.trim(), raw);
+    }
+
     public static List<HL7ResultParser.ParsedResults> parseCsv(
             byte[] content, Map<String, String> columnMappings,
             String delimiter, int skipRows, String perFileTestCode,
@@ -484,6 +517,16 @@ public class FileResultParser {
             String delimiter, int skipRows, String perFileTestCode,
             ControlResultRecognition recognition, TabularFileLayout layout,
             TabularResultValueSelection resultSelection) {
+        return parseCsv(
+                content, columnMappings, delimiter, skipRows, perFileTestCode,
+                recognition, layout, resultSelection, Map.of());
+    }
+
+    public static List<HL7ResultParser.ParsedResults> parseCsv(
+            byte[] content, Map<String, String> columnMappings,
+            String delimiter, int skipRows, String perFileTestCode,
+            ControlResultRecognition recognition, TabularFileLayout layout,
+            TabularResultValueSelection resultSelection, Map<String, String> testCodeValues) {
 
         if (content == null || content.length == 0 || columnMappings == null || columnMappings.isEmpty()) {
             log.warn("FileResultParser.parseCsv: null/empty input or column mappings");
@@ -549,7 +592,8 @@ public class FileResultParser {
             try (StringReader reader = new StringReader(csvContent.toString())) {
                 for (CSVRecord record : format.parse(reader)) {
                     String sampleId = getMappedValue(record, columnMappings, "sampleId");
-                    String testCode = getMappedValue(record, columnMappings, "testCode");
+                    String testCode = translateTestCode(
+                            getMappedValue(record, columnMappings, "testCode"), testCodeValues);
                     String units = getMappedValue(record, columnMappings, "units");
                     String qcTask = getMappedValue(record, columnMappings, "qcTask");
                     String testDate = getMappedValue(record, columnMappings, "testDate");

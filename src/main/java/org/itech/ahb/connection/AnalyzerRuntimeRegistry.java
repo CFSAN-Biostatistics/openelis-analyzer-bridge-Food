@@ -456,6 +456,9 @@ public class AnalyzerRuntimeRegistry {
      */
     private java.util.Map<String, String> columnMappings;
 
+    /** What the values of the FILE test-code column mean, when the profile says (test_code_values). */
+    private java.util.Map<String, String> testCodeValues = java.util.Map.of();
+
     /**
      * File format (CSV, EXCEL, TSV). Determines which parser to use.
      * Extension-based detection is the primary dispatch; this is metadata.

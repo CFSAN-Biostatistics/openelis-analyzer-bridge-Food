@@ -103,6 +103,28 @@ class AnalyzerProfileValidatorTest {
   }
 
   @Test
+  void testCodeValuesNeedATestCodeColumn() throws Exception {
+    ObjectNode profile = fileProfile();
+    profile.withObject("column_mapping").remove("TargetName");
+    profile.withObject("column_mapping").remove("testCode");
+    profile.withObject("test_code_values").put("1", "VIH-1");
+
+    assertThat(validator.validationIssues(profile)).contains(
+      "$.test_code_values needs a column mapped to testCode in $.column_mapping"
+    );
+  }
+
+  @Test
+  void testCodeValuesMayOnlyNameDeclaredTests() throws Exception {
+    ObjectNode profile = fileProfile();
+    profile.withObject("test_code_values").put("2", "IC");
+
+    assertThat(validator.validationIssues(profile)).contains(
+      "$.test_code_values.2 names IC, which $.default_test_mappings does not declare"
+    );
+  }
+
+  @Test
   void aColumnOnlyFileProfileDefaultsToTheResultSemantic() throws Exception {
     ObjectNode profile = fileProfile();
     profile.remove("result_value_order");

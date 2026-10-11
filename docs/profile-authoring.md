@@ -60,6 +60,21 @@ record the component receives, in the vendor's HL7 sub-ID notation: the analyte 
 names (`HIV-1&Ct`, `&LOG`). The component with no `sub_identity` takes the main record's call. A
 qualitative component that has a `sub_identity` declares its `values`.
 
+## A file's test-code column
+
+A tabular file names each row's test in the column `column_mapping` marks `testCode`, or, when
+no column does, every row takes the connection's file-wide test code. When that column carries
+something other than a test code, `test_code_values` says what each value means. The Madagascar
+FluoroCycler workbook numbers its detection channels:
+
+```json
+"column_mapping": { "Sample ID": "sampleId", "Col": "testCode", "Calc. Conc.": "result", "Result": "interpretation" },
+"test_code_values": { "1": "VIH-1", "2": "IC" }
+```
+
+Every translated code must be a declared test. A value the map does not name is kept as the file
+carries it, so OpenELIS holds the row as a code nobody has mapped rather than guessing.
+
 ## Where each part of a result sits
 
 `configDefaults.extractionOverrides.resultParts` gives the field that holds each part. ASTM names

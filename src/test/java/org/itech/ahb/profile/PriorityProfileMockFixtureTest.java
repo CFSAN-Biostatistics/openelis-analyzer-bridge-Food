@@ -38,7 +38,6 @@ class PriorityProfileMockFixtureTest {
     JsonNode profile = profile(template.path("profileRef"));
     JsonNode resolvedTemplate = resolveMockTemplate(mockRoot, "hain_fluorocycler", profile);
     JsonNode fixture = template.path("fixture");
-    String profileFileTestCode = onlyMappingCode(profile);
     Path fixturePath = mockRoot.resolve(fixture.path("file").asText());
 
     Map<String, String> columnMappings = new LinkedHashMap<>();
@@ -47,19 +46,42 @@ class PriorityProfileMockFixtureTest {
       .fields()
       .forEachRemaining(entry -> columnMappings.put(entry.getKey(), entry.getValue().asText()));
 
+    Map<String, String> testCodeValues = new LinkedHashMap<>();
+    profile
+      .path("test_code_values")
+      .fields()
+      .forEachRemaining(entry -> testCodeValues.put(entry.getKey(), entry.getValue().asText()));
+    Map<String, Set<String>> declaredValues = new LinkedHashMap<>();
+    profile
+      .path("default_test_mappings")
+      .forEach(mapping -> declaredValues.put(mapping.path("test_code").asText(), textValues(mapping.path("values"))));
+
     Set<String> parsedCodes = new LinkedHashSet<>();
+    List<String> unresolved = new java.util.ArrayList<>();
     int parsedResultCount;
     try (InputStream input = Files.newInputStream(fixturePath)) {
       var parsed = FileResultParser.parse(
         input,
         columnMappings,
-        profileFileTestCode,
+        null,
         ControlResultRecognition.fromProfile(profile.path("controlResultRecognition")),
         null,
-        TabularResultValueSelection.fromProfile(profile)
+        TabularResultValueSelection.fromProfile(profile),
+        testCodeValues
       );
       parsedResultCount = parsed.stream().mapToInt(results -> results.results().size()).sum();
-      parsed.forEach(results -> results.results().forEach(result -> parsedCodes.add(result.testCode())));
+      parsed.forEach(results ->
+        results
+          .results()
+          .forEach(result -> {
+            parsedCodes.add(result.testCode());
+            Set<String> values = declaredValues.get(result.testCode());
+            if (values == null) {
+              unresolved.add(results.accessionNumber() + " " + result.testCode() + ": test not declared");
+            } else if (!result.isNumeric() && !values.contains(result.value())) {
+              unresolved.add(results.accessionNumber() + " " + result.testCode() + ": value " + result.value());
+            }
+          }));
     }
 
     assertSoftly(softly -> {
@@ -86,8 +108,8 @@ class PriorityProfileMockFixtureTest {
         )
         .as("Bridge watcher glob matches the mock fixture")
         .isTrue();
-      softly.assertThat(mappingCodes(profile)).containsExactly(profileFileTestCode);
-      softly.assertThat(parsedCodes).containsExactly(profileFileTestCode);
+      softly.assertThat(parsedCodes).containsExactlyInAnyOrderElementsOf(mappingCodes(profile));
+      softly.assertThat(unresolved).as("every row resolves to a declared test and value").isEmpty();
       softly.assertThat(parsedResultCount).as("every mock FILE result row is preserved").isEqualTo(4);
     });
   }
@@ -143,12 +165,6 @@ class PriorityProfileMockFixtureTest {
     Set<String> codes = new LinkedHashSet<>();
     profile.path("default_test_mappings").forEach(mapping -> codes.add(mapping.path("test_code").asText()));
     return codes;
-  }
-
-  private static String onlyMappingCode(JsonNode profile) {
-    Set<String> codes = mappingCodes(profile);
-    assertThat(codes).hasSize(1);
-    return codes.iterator().next();
   }
 
   private static Set<String> textValues(JsonNode values) {

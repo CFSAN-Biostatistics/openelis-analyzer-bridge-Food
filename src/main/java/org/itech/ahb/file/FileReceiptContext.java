@@ -32,7 +32,8 @@ public record FileReceiptContext(
   TabularResultValueSelection resultSelection,
   ControlResultRecognition recognition,
   Map<String, String> codeToLoinc,
-  @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, String> profileCodeByInstrumentCode
+  @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, String> profileCodeByInstrumentCode,
+  @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, String> testCodeValues
 ) {
   public FileReceiptContext {
     if (version != 1) throw new IllegalArgumentException("Unsupported FILE receipt context version: " + version);
@@ -47,6 +48,7 @@ public record FileReceiptContext(
     profileCodeByInstrumentCode = profileCodeByInstrumentCode == null
       ? Map.of()
       : Map.copyOf(profileCodeByInstrumentCode);
+    testCodeValues = testCodeValues == null ? Map.of() : Map.copyOf(testCodeValues);
   }
 
   public static FileReceiptContext capture(Path path, AnalyzerEntry entry, String explicitTestCode) {
@@ -74,7 +76,8 @@ public record FileReceiptContext(
       entry.getTabularResultValueSelection(),
       entry.getControlResultRecognition(),
       entry.getCodeToLoinc(),
-      entry.getResultReading() == null ? Map.of() : entry.getResultReading().profileCodeByInstrumentCode()
+      entry.getResultReading() == null ? Map.of() : entry.getResultReading().profileCodeByInstrumentCode(),
+      entry.getTestCodeValues()
     );
   }
 
