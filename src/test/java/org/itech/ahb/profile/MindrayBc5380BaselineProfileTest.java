@@ -120,7 +120,7 @@ class MindrayBc5380BaselineProfileTest {
   void everyAlarmTable10ListsIsASampleFlagAndTheMicroscopeExamReachesTheLab() throws Exception {
     JsonNode overrides = profile().path("configDefaults").path("extractionOverrides");
     Set<String> flags = new LinkedHashSet<>();
-    overrides.path("sampleFlags").path("codes").forEach(code -> flags.add(code.asText()));
+    profile().path("sample_flags").path("codes").forEach(code -> flags.add(code.asText()));
     Set<String> notResults = new LinkedHashSet<>();
     overrides.path("resultRecordSelection").path("values").forEach(value -> notResults.add(value.asText()));
 

@@ -144,8 +144,14 @@ public class HL7ResultParser {
         }
       }
 
-      SampleFlags.Reported flag = "OBX".equals(segment) && reading != null
-        ? reading.sampleFlags().read(fieldValues)
+      SampleFlags.Reported flag = "OBX".equals(segment) && reading != null && parts != null
+        ? reading
+          .sampleFlags()
+          .read(
+            Hl7ResultParts.read(parts.testCode(), fieldValues),
+            Hl7ResultParts.read(nameBeside(parts.testCode()), fieldValues),
+            Hl7ResultParts.read(parts.value(), fieldValues)
+          )
         : null;
       if (flag != null) {
         if (flag.raised()) {
@@ -449,6 +455,18 @@ public class HL7ResultParser {
     return null;
   }
 
+  /** The field holding the instrument's name for a code: the component after the code's (OBX-3.1, OBX-3.2). */
+  static String nameBeside(String codeField) {
+    if (codeField == null) {
+      return null;
+    }
+    String[] parts = codeField.split("\\.");
+    if (parts.length != 3) {
+      return null;
+    }
+    return parts[0] + "." + parts[1] + "." + (Integer.parseInt(parts[2]) + 1);
+  }
+
   /**
    * @param patient the patient the instrument reported, when its profile says where to read one
    * @param specimenDescriptor the instrument's own description of the specimen, as sent
@@ -476,6 +494,27 @@ public class HL7ResultParser {
       String specimenDescriptor
     ) {
       this(accessionNumber, results, patient, specimenDescriptor, List.of());
+    }
+
+    /**
+     * A file's rows that the profile names as warnings about the sample, taken out of the results:
+     * a raised one is a flag on the sample, one not raised says nothing.
+     */
+    public ParsedResults withFileSampleFlags(org.itech.ahb.profile.SampleFlags flags) {
+      if (flags == null || flags.codes().isEmpty()) {
+        return this;
+      }
+      List<AnalyzerResult> kept = new java.util.ArrayList<>();
+      List<SampleFlag> raised = new java.util.ArrayList<>(sampleFlags);
+      for (AnalyzerResult result : results) {
+        org.itech.ahb.profile.SampleFlags.Reported flag = flags.read(result.testCode(), "", result.value());
+        if (flag == null) {
+          kept.add(result);
+        } else if (flag.raised()) {
+          raised.add(new SampleFlag(flag.code(), flag.name(), flag.value()));
+        }
+      }
+      return new ParsedResults(accessionNumber, kept, patient, specimenDescriptor, raised);
     }
 
     /** These results under the profile's own codes, where the connection sets other codes for its instrument. */

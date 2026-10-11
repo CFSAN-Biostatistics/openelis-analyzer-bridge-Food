@@ -69,7 +69,7 @@ public record ResultReading(
       configured.charAt(0),
       runFailures,
       profileCodeByInstrumentCode,
-      SampleFlags.fromProfile(configDefaults, protocol)
+      SampleFlags.fromProfile(profile)
     );
   }
 

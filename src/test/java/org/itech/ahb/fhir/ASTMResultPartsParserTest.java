@@ -235,10 +235,7 @@ class ASTMResultPartsParserTest {
   @Test
   void aRaisedAlarmTheProfileNamesTravelsWithTheSampleAndIsNeverAResult() throws Exception {
     ObjectNode profile = BaselineProfileFixtures.genexpertHivViralLoad(new ObjectMapper());
-    ObjectNode flags = profile.withObject("configDefaults").withObject("extractionOverrides").putObject("sampleFlags");
-    flags.put("codeField", "R.3.4");
-    flags.put("nameField", "R.3.5");
-    flags.put("valueField", "R.4");
+    ObjectNode flags = profile.putObject("sample_flags");
     flags.put("raisedValue", "T");
     flags.putArray("codes").add("LIPEMIA").add("HEMOLYSIS");
 

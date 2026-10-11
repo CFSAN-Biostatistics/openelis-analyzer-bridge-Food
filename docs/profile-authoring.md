@@ -108,21 +108,26 @@ A profile without `resultParts` is read as before.
 
 ## Warnings about the sample
 
-Some instruments send yes or no warnings about the sample as records of their own, such as a
-hematology analyzer's alarms (Anemia, Platelet Clump?). `configDefaults.extractionOverrides.sampleFlags`
-names them: the fields that hold a record's code, name and value, the value that means raised, and
-the codes. A record carrying one of these codes is never a result. A raised one goes in the bundle as
-an Observation classified `SAMPLE_FLAG`, under the code and name the instrument sent, and OpenELIS
-shows it with the sample's results; one not raised is dropped. ASTM fields are R record fields:
+Some instruments send yes or no warnings about the sample as records of their own: a hematology
+analyzer's alarms (Anemia, Platelet Clump?), a PCR run's internal-control validity. `sample_flags`
+names them: the codes, the value that means raised, and a name per code where the record carries
+none. A record carrying one of these codes is never a result. A raised one goes in the bundle as
+an Observation classified `SAMPLE_FLAG`, and OpenELIS shows it with the sample's results and keeps
+it as a note on the analysis once accepted; one not raised is dropped. The record's code and value
+are read where a result's are, whatever the protocol; the instrument's name for the code, when it
+sends one, sits beside the code (OBX-3.2, R.3.5):
 
 ```json
-"sampleFlags": {
-  "codeField": "OBX.3.1", "nameField": "OBX.3.2", "valueField": "OBX.5",
-  "raisedValue": "T", "codes": ["12014", "15180-3"]
-}
+"sample_flags": { "raisedValue": "T", "codes": ["12014", "15180-3"] }
 ```
 
-A profile without `sampleFlags` has no record that is a warning.
+A file carries no name, so a FILE profile names each flag:
+
+```json
+"sample_flags": { "raisedValue": "Invalid", "codes": ["IC"], "names": { "IC": "Internal control invalid" } }
+```
+
+A profile without `sample_flags` has no record that is a warning.
 
 ## Number format
 

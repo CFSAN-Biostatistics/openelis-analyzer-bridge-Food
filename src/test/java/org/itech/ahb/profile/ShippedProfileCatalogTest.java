@@ -24,7 +24,7 @@ class ShippedProfileCatalogTest {
     "hain-fluorocycler-xt",
     "sha256:5989781fabb39c7e405f6f1427823af5f9a40bfd0721abf470fda8f95551f4f7",
     "mindray-bc5380",
-    "sha256:b1e182b5fdd68215e2e5c57aa988615968ff8eb1fed1fe58a9b0364c60a6c7a8",
+    "sha256:031b4198f23aa8dc4d21a9f20a148e7057fde4eafcb381d26d2aed6e6677621c",
     "thermo-quantstudio",
     "sha256:9b5a84ddbc724ee696823898105a4f49edd41160fb9400bc51c109cda5d91ce1"
   );

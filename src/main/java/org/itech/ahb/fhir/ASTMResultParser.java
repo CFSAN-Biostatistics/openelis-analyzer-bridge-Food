@@ -123,9 +123,9 @@ public class ASTMResultParser {
                 }
                 case "R" -> {
                     commentTarget = -1;
-                    SampleFlags.Reported flag = reading == null
+                    SampleFlags.Reported flag = reading == null || parts == null
                             ? null
-                            : reading.sampleFlags().read(line.split(Pattern.quote(FIELD_DELIMITER), -1));
+                            : flagOf(line.split(Pattern.quote(FIELD_DELIMITER), -1), parts, reading);
                     if (flag != null) {
                         if (flag.raised() && accession != null) {
                             sampleFlags.add(new SampleFlag(flag.code(), flag.name(), flag.value()));
@@ -257,6 +257,16 @@ public class ASTMResultParser {
      * Extract segment type identifier.
      * Ported from GenericASTMLineInserter.getSegmentType().
      */
+    /** The flag an R record carries: its code, the name beside the code, and its call or number. */
+    private static SampleFlags.Reported flagOf(String[] fields, AstmResultParts parts, ResultReading reading) {
+        String value = AstmResultParts.read(parts.call(), fields);
+        if (value.isEmpty()) value = AstmResultParts.read(parts.number(), fields);
+        return reading.sampleFlags().read(
+                AstmResultParts.read(parts.testCode(), fields),
+                AstmResultParts.read(parts.assayName(), fields),
+                value);
+    }
+
     private static String getSegmentType(String line) {
         int pos = line.indexOf(FIELD_DELIMITER);
         if (pos > 0) return line.substring(0, pos);

@@ -84,9 +84,26 @@ flags. An observation with no value is not a result. A profile without
 
 `resultRecordSelection` says which OBX segments carry results. `ALL`, the
 default, reads every one. `EXCLUDE` names a `targetField` and the `values` that
-mark an OBX as something else, such as an instrument's settings, histogram
-images or alarms; every other OBX is a result, including one under a code the
+mark an OBX as something else, such as an instrument's settings or histogram
+images; every other OBX is a result or, under `sample_flags`, a warning, including one under a code the
 profile does not declare, which OpenELIS holds for review.
+
+## Record kinds
+
+What an instrument says about a sample is of one of three kinds, and a profile declares each
+record under exactly one section (the Bridge refuses a profile that declares a code under two):
+
+| Kind                               | Section                                                 | Where it ends in OpenELIS                                 |
+| ---------------------------------- | ------------------------------------------------------- | --------------------------------------------------------- |
+| a result for a test the lab orders | `default_test_mappings` (with its parts and components) | the ordered analysis, or held for placement               |
+| a value on a control material      | `controlResultRecognition` (which samples are controls) | the QC module                                             |
+| a warning about the sample         | `sample_flags`                                          | the review row and a note on the analysis; never a result |
+| a record the instrument also sends | `resultRecordSelection` (`EXCLUDE`)                     | not received                                              |
+
+A record the profile does not declare at all reaches OpenELIS as a code nobody has mapped, which
+the lab maps or marks Do not receive. Where a record's parts sit on the wire is a reading setting
+(`resultParts`, `column_mapping`), never a kind; a new kind needs a rule in the OpenELIS analyzer
+spec before a profile field.
 
 ## Ownership boundary
 
