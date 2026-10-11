@@ -25,6 +25,8 @@ class ShippedProfileCatalogTest {
     "sha256:5989781fabb39c7e405f6f1427823af5f9a40bfd0721abf470fda8f95551f4f7",
     "hain-fluorocycler-xt-madagascar",
     "sha256:630b4c76fce3b62529bace793708be2024cfcb1be22c88cdc3698ac72212d212",
+    "mindray-bc5380",
+    "sha256:b1e182b5fdd68215e2e5c57aa988615968ff8eb1fed1fe58a9b0364c60a6c7a8",
     "thermo-quantstudio",
     "sha256:9b5a84ddbc724ee696823898105a4f49edd41160fb9400bc51c109cda5d91ce1"
   );
@@ -90,6 +92,7 @@ class ShippedProfileCatalogTest {
         "hain-fluorocycler-xt",
         "hain-fluorocycler-xt-madagascar",
         "cepheid-genexpert-astm",
+        "mindray-bc5380",
         "thermo-quantstudio"
       );
     assertThat(catalog.latest()).allSatisfy(revision -> {
@@ -139,6 +142,12 @@ class ShippedProfileCatalogTest {
           assertThat(profile.path("column_mapping").path("Col").asText()).isEqualTo("testCode");
           assertThat(profile.path("test_code_values").path("1").asText()).isEqualTo("VIH-1");
           assertThat(profile.path("test_code_values").path("2").asText()).isEqualTo("IC");
+        }
+        case "mindray-bc5380" -> {
+          JsonNode extraction = profile.path("configDefaults").path("extractionOverrides");
+          // The instrument's settings and histogram segments are not results; every other OBX is.
+          assertThat(extraction.path("resultRecordSelection").path("mode").asText()).isEqualTo("EXCLUDE");
+          assertThat(extraction.path("resultParts").isObject()).isTrue();
         }
         case "thermo-quantstudio" -> assertThat(profile.path("result_value_order"))
           .extracting(JsonNode::asText)
