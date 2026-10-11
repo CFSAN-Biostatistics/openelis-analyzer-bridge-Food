@@ -191,8 +191,21 @@ public class HL7ResultParser {
       return null;
     }
     String valueType = Hl7ResultParts.read("OBX.2", fields);
-    String canonical = reading.canonicalNumber(value);
+    String comparator = null;
+    String numberText = value;
+    if ("SN".equals(valueType)) {
+      // SN is comparator^number[^separator^number]: a ratio or a range is not one number.
+      String[] components = value.split(Pattern.quote(String.valueOf(delimiters.component())), -1);
+      String sign = components[0].trim();
+      boolean single = components.length < 3 || components[2].isBlank();
+      numberText = single && SN_COMPARATORS.contains(sign) && components.length > 1 ? components[1].trim() : "";
+      comparator = sign.isEmpty() || "=".equals(sign) ? null : sign;
+    }
+    String canonical = reading.canonicalNumber(numberText);
     boolean numeric = ("NM".equals(valueType) || "SN".equals(valueType)) && NumericValue.isBoundedDecimal(canonical);
+    if (!numeric) {
+      comparator = null;
+    }
     String subIdentity = Hl7ResultParts.read(parts.subIdentity(), fields);
     String unit = Hl7ResultParts.read(parts.unit(), fields);
     String range = Hl7ResultParts.read(parts.range(), fields);
@@ -204,7 +217,7 @@ public class HL7ResultParser {
       subIdentity,
       numeric ? null : value,
       numeric ? canonical : null,
-      null,
+      comparator,
       null,
       blankToNull(range),
       flags,
@@ -217,10 +230,10 @@ public class HL7ResultParser {
       List.of()
     );
     AnalyzerResult result = numeric
-      ? AnalyzerResult.numeric(testCode, testCode, value, blankToNull(unit))
+      ? AnalyzerResult.numeric(testCode, testCode, "SN".equals(valueType) ? canonical : value, blankToNull(unit))
       : AnalyzerResult.text(testCode, testCode, value);
     String completed = Hl7ResultParts.read(parts.completed(), fields);
-    String time = completed.isEmpty() ? null : ASTMResultParser.astmTime(completed);
+    String time = completed.isEmpty() ? null : hl7Time(completed);
     if (time != null) {
       result = result.withTimestamp(time);
     }
@@ -348,6 +361,43 @@ public class HL7ResultParser {
   }
 
   private record Delimiters(char field, char component, char repetition, char subcomponent) {}
+
+  private static final Set<String> SN_COMPARATORS = Set.of("", "=", "<", ">", "<=", ">=");
+  private static final Pattern HL7_TIME = Pattern.compile(
+    "(\\d{8}(?:\\d{2}(?:\\d{2}(?:\\d{2})?)?)?)(?:\\.\\d{1,4})?([+-]\\d{4})?"
+  );
+  private static final java.time.format.DateTimeFormatter FHIR_DATE_TIME = java.time.format.DateTimeFormatter.ofPattern(
+    "yyyy-MM-dd'T'HH:mm:ssXXX"
+  );
+
+  /**
+   * An HL7 DTM (YYYYMMDD[HH[MM[SS[.S[S[S[S]]]]]]][+/-ZZZZ]) as FHIR dateTime: a date alone stays a
+   * date, a time keeps its offset or takes the Bridge's zone, and fractions of a second are dropped.
+   */
+  static String hl7Time(String raw) {
+    java.util.regex.Matcher match = HL7_TIME.matcher(raw.trim());
+    if (!match.matches()) {
+      log.warn("Ignoring unreadable HL7 time '{}'", raw);
+      return null;
+    }
+    String digits = match.group(1);
+    if (digits.length() == 8) {
+      return ASTMResultParser.astmTime(digits);
+    }
+    try {
+      java.time.LocalDateTime local = java.time.LocalDateTime.parse(
+        (digits + "0000").substring(0, 14),
+        java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+      );
+      java.time.ZoneId zone = match.group(2) == null
+        ? java.time.ZoneId.systemDefault()
+        : java.time.ZoneOffset.of(match.group(2).substring(0, 3) + ":" + match.group(2).substring(3));
+      return local.atZone(zone).format(FHIR_DATE_TIME);
+    } catch (java.time.DateTimeException e) {
+      log.warn("Ignoring unreadable HL7 time '{}'", raw);
+      return null;
+    }
+  }
 
   /**
    * Parse HL7 from raw message string (splits on segment terminators first).

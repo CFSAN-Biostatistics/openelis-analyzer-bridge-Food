@@ -115,6 +115,53 @@ class HL7ResultPartsTest {
     assertThat(wbc.parts().notes()).containsExactly("Repeat with a fresh sample");
   }
 
+  @Test
+  void aStructuredNumericValueKeepsItsComparatorAndNumberAndARatioStaysText() {
+    List<AnalyzerResult> results = HL7ResultParser.parse(
+      List.of(
+        "MSH|^~\\&|BC-5380|Mindray|||20080617143943||ORU^R01|1|P|2.3.1",
+        "OBR|1||S-1|00001^Automated Count^99MRC",
+        "OBX|1|SN|777-3^PLT^LN||>^1000|10*9/L|100-300||||F",
+        "OBX|2|SN|6690-2^WBC^LN||^12.5|10*9/L|4.00-10.00||||F",
+        "OBX|3|SN|5048-4^Titer^LN||^1^:^128|||||||F"
+      ),
+      ControlResultRecognition.none(),
+      Hl7SpecimenPosition.PRECEDING,
+      selection("ALL"),
+      reading()
+    ).results();
+
+    AnalyzerResult plt = results.get(0);
+    assertThat(plt.isNumeric()).isTrue();
+    assertThat(plt.parts().number()).isEqualTo("1000");
+    assertThat(plt.parts().comparator()).isEqualTo(">");
+    AnalyzerResult wbc = results.get(1);
+    assertThat(wbc.isNumeric()).isTrue();
+    assertThat(wbc.parts().number()).isEqualTo("12.5");
+    assertThat(wbc.parts().comparator()).isNull();
+    AnalyzerResult titer = results.get(2);
+    assertThat(titer.isNumeric()).isFalse();
+    assertThat(titer.parts().call()).isEqualTo("^1^:^128");
+  }
+
+  @Test
+  void anHl7TimestampWithAnOffsetOrFractionalSecondsKeepsItsTime() {
+    List<AnalyzerResult> results = HL7ResultParser.parse(
+      List.of(
+        "MSH|^~\\&|BC-5380|Mindray|||20080617143943||ORU^R01|1|P|2.3.1",
+        "OBR|1||S-1|00001^Automated Count^99MRC|||20261010123000.25-0500",
+        "OBX|1|NM|6690-2^WBC^LN||12.5|10*9/L|4.00-10.00||||F"
+      ),
+      ControlResultRecognition.none(),
+      Hl7SpecimenPosition.PRECEDING,
+      selection("ALL"),
+      reading()
+    ).results();
+
+    assertThat(results.get(0).timestamp()).startsWith("2026-10-10T12:30:00");
+    assertThat(results.get(0).timestamp()).endsWith("-05:00");
+  }
+
   private static ParsedResults parse(List<String> message, Hl7ResultRecordSelection selection) {
     return HL7ResultParser.parse(
       message,

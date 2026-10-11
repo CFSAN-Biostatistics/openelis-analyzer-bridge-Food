@@ -21,6 +21,7 @@ import org.itech.ahb.connection.AnalyzerRuntimeRegistry.AnalyzerEntry;
 import org.itech.ahb.model.Protocol;
 import org.itech.ahb.model.Transport;
 import org.itech.ahb.normalizer.MessageEnvelope;
+import org.itech.ahb.outbox.RenderedDelivery;
 import org.itech.ahb.profile.ControlResultRecognition;
 import org.itech.ahb.profile.Hl7ResultRecordSelection;
 import org.itech.ahb.profile.Hl7SpecimenPosition;
@@ -58,7 +59,65 @@ class NormalizedBundleRendererHl7Test {
     assertThat(render()).doesNotContainKeys("08001", "08002", "08003", "01002", "30525-0", "15008", "15200");
   }
 
+  @Test
+  void eachPatientsResultGroupIsItsOwnDeliveryWithItsOwnPatient() throws Exception {
+    String one = example();
+    String body = one.substring(one.indexOf("PID|"));
+    String second = body
+      .replace("7393670^^^^MR", "5550001^^^^MR")
+      .replace("Joan^JIang", "Second^Patient")
+      .replace("|20071207011|", "|20071207012|");
+
+    NormalizedBundleRenderer.Outcome outcome = renderMessage(one + second);
+
+    assertThat(outcome).isInstanceOf(NormalizedBundleRenderer.Outcome.Rendered.class);
+    var deliveries = ((NormalizedBundleRenderer.Outcome.Rendered) outcome).deliveries();
+    assertThat(deliveries).extracting(RenderedDelivery::accession).containsExactly("20071207011", "20071207012");
+    assertThat(deliveries).extracting(RenderedDelivery::deliveryId).doesNotHaveDuplicates();
+    assertThat(patientIdentifier(deliveries.get(0))).isEqualTo("7393670");
+    assertThat(patientIdentifier(deliveries.get(1))).isEqualTo("5550001");
+  }
+
+  private static String patientIdentifier(RenderedDelivery delivery) {
+    Bundle bundle = FHIR.newJsonParser().parseResource(Bundle.class, delivery.fhirJson());
+    return bundle
+      .getEntry()
+      .stream()
+      .map(Bundle.BundleEntryComponent::getResource)
+      .filter(org.hl7.fhir.r4.model.Patient.class::isInstance)
+      .map(org.hl7.fhir.r4.model.Patient.class::cast)
+      .map(patient -> patient.getIdentifierFirstRep().getValue())
+      .findFirst()
+      .orElse(null);
+  }
+
+  private static String example() throws Exception {
+    return Files.readString(
+      Path.of("src", "test", "resources", "mindray-examples", "bc5380-c.3.3.hl7"),
+      StandardCharsets.UTF_8
+    ).replace("\n", "\r");
+  }
+
   private Map<String, Observation> render() throws Exception {
+    NormalizedBundleRenderer.Outcome outcome = renderMessage(example());
+    assertThat(outcome).isInstanceOf(NormalizedBundleRenderer.Outcome.Rendered.class);
+    Bundle bundle = FHIR.newJsonParser()
+      .parseResource(
+        Bundle.class,
+        ((NormalizedBundleRenderer.Outcome.Rendered) outcome).deliveries().get(0).fhirJson()
+      );
+    return bundle
+      .getEntry()
+      .stream()
+      .map(Bundle.BundleEntryComponent::getResource)
+      .filter(Observation.class::isInstance)
+      .map(Observation.class::cast)
+      .collect(
+        Collectors.toMap(observation -> observation.getCode().getCodingFirstRep().getCode(), Function.identity())
+      );
+  }
+
+  private NormalizedBundleRenderer.Outcome renderMessage(String message) throws Exception {
     ObjectNode profile;
     try (InputStream input = getClass().getClassLoader().getResourceAsStream("analyzer-profiles/mindray-bc5380.json")) {
       profile = (ObjectNode) objectMapper.readTree(input);
@@ -77,12 +136,7 @@ class NormalizedBundleRendererHl7Test {
     entry.setRecognitionFingerprint(profile.path("catalog").path("recognitionFingerprint").asText());
     entry.setResultReading(ResultReading.fromProfile(profile));
     registry.register("10.0.0.8", entry);
-    String message = Files.readString(
-      Path.of("src", "test", "resources", "mindray-examples", "bc5380-c.3.3.hl7"),
-      StandardCharsets.UTF_8
-    ).replace("\n", "\r");
-
-    NormalizedBundleRenderer.Outcome outcome = new NormalizedBundleRenderer(registry).render(
+    return new NormalizedBundleRenderer(registry).render(
       MessageEnvelope.builder()
         .protocol(Protocol.HL7)
         .transport(Transport.HTTP)
@@ -92,21 +146,5 @@ class NormalizedBundleRendererHl7Test {
         .build(),
       "http://localhost/analyzer"
     );
-
-    assertThat(outcome).isInstanceOf(NormalizedBundleRenderer.Outcome.Rendered.class);
-    Bundle bundle = FHIR.newJsonParser()
-      .parseResource(
-        Bundle.class,
-        ((NormalizedBundleRenderer.Outcome.Rendered) outcome).deliveries().get(0).fhirJson()
-      );
-    return bundle
-      .getEntry()
-      .stream()
-      .map(Bundle.BundleEntryComponent::getResource)
-      .filter(Observation.class::isInstance)
-      .map(Observation.class::cast)
-      .collect(
-        Collectors.toMap(observation -> observation.getCode().getCodingFirstRep().getCode(), Function.identity())
-      );
   }
 }
