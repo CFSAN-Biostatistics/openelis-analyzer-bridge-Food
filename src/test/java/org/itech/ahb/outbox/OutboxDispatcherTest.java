@@ -96,7 +96,14 @@ class OutboxDispatcherTest {
     );
   }
 
+  private static final String BUNDLE_WITH_A_RESULT =
+    "{\"resourceType\":\"Bundle\",\"entry\":[{\"resource\":{\"resourceType\":\"Observation\"}}]}";
+
   private String queueOneDelivery() {
+    return queueOneDelivery(BUNDLE_WITH_A_RESULT);
+  }
+
+  private String queueOneDelivery(String fhirJson) {
     Receipt receipt = store.receive(
       new ReceivedMessage(
         "10.0.0.1",
@@ -116,7 +123,7 @@ class OutboxDispatcherTest {
         new RenderedDelivery(
           id,
           "ACC-1",
-          "{\"resourceType\":\"Bundle\"}",
+          fhirJson,
           "conn-1",
           "analyzer-1",
           "profile",
@@ -225,6 +232,39 @@ class OutboxDispatcherTest {
     ).dispatchDue();
 
     assertEquals(OutboxState.DELIVERED, store.get(id).orElseThrow().state());
+  }
+
+  @Test
+  @DisplayName("holds a sample with no result instead of sending OpenELIS a bundle it must refuse")
+  void holdsASampleWithNoResult() {
+    String id = queueOneDelivery(
+      "{\"resourceType\":\"Bundle\",\"entry\":[{\"resource\":{\"resourceType\":\"DiagnosticReport\"}}]}"
+    );
+    ScriptedOpenElis openElis = ScriptedOpenElis.create();
+
+    dispatcher(openElis).dispatchDue();
+
+    OutboxEntry entry = store.get(id).orElseThrow();
+    assertEquals(OutboxState.DMQ, entry.state());
+    assertEquals(FailureReason.PARSE_NO_RESULTS, entry.failureReason());
+    assertTrue(openElis.sent.isEmpty(), "nothing is sent for a sample with no result");
+    assertTrue(entry.lastError().contains("ACC-1"), entry.lastError());
+  }
+
+  @Test
+  @DisplayName("holds a sample whose only observations are raised flags, which OpenELIS does not count as results")
+  void holdsASampleWithOnlyFlags() {
+    String id = queueOneDelivery(
+      "{\"resourceType\":\"Bundle\",\"entry\":[{\"resource\":{\"resourceType\":\"Observation\",\"extension\":[" +
+      "{\"url\":\"https://openelis-global.org/fhir/StructureDefinition/analyzer-result-classification\"," +
+      "\"valueCode\":\"SAMPLE_FLAG\"}]}}]}"
+    );
+    ScriptedOpenElis openElis = ScriptedOpenElis.create();
+
+    dispatcher(openElis).dispatchDue();
+
+    assertEquals(FailureReason.PARSE_NO_RESULTS, store.get(id).orElseThrow().failureReason());
+    assertTrue(openElis.sent.isEmpty(), "nothing is sent for a sample with only flags");
   }
 
   @Test

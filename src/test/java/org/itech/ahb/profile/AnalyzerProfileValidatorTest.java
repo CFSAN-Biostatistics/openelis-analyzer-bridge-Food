@@ -103,6 +103,18 @@ class AnalyzerProfileValidatorTest {
   }
 
   @Test
+  void testCodeValuesNeedATestCodeColumn() throws Exception {
+    ObjectNode profile = fileProfile();
+    profile.withObject("column_mapping").remove("TargetName");
+    profile.withObject("column_mapping").remove("testCode");
+    profile.withObject("test_code_values").put("1", "VIH-1");
+
+    assertThat(validator.validationIssues(profile)).contains(
+      "$.test_code_values needs a column mapped to testCode in $.column_mapping"
+    );
+  }
+
+  @Test
   void aCodeIsOfOneKindOnly() throws Exception {
     ObjectNode profile = astmProfile();
     String test = profile.path("default_test_mappings").get(0).path("test_code").asText();
@@ -113,6 +125,22 @@ class AnalyzerProfileValidatorTest {
     assertThat(validator.validationIssues(profile)).contains(
       "$.sample_flags.codes lists " + test + ", which $.default_test_mappings declares as a test"
     );
+  }
+
+  @Test
+  void testCodeValuesNameADeclaredTestOrASampleFlag() throws Exception {
+    ObjectNode profile = fileProfile();
+    profile.withObject("test_code_values").put("2", "IC");
+    String issue = "$.test_code_values.2 names IC, which neither $.default_test_mappings nor $.sample_flags declares";
+
+    assertThat(validator.validationIssues(profile)).contains(issue);
+
+    ObjectNode flags = profile.putObject("sample_flags");
+    flags.put("raisedValue", "Invalid");
+    flags.putArray("codes").add("IC");
+    flags.putObject("names").put("IC", "Internal control invalid");
+
+    assertThat(validator.validationIssues(profile)).doesNotContain(issue);
   }
 
   @Test

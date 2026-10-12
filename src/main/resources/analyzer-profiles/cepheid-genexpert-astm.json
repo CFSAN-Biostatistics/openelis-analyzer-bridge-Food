@@ -235,96 +235,6 @@
           "label": "HIV-1 Delta Ct",
           "result_type": "quantitative",
           "sub_identity": "HIV-1&Delta Ct"
-        },
-        {
-          "code": "IQS-H",
-          "label": "IQS-H",
-          "result_type": "qualitative",
-          "sub_identity": "IQS-H",
-          "values": ["PASS", "FAIL"],
-          "run_failure_values": ["NO RESULT"],
-          "translations": {
-            "NO RESULT": [
-              "PAS DE RÉSULTAT",
-              "KEIN ERGEBNIS",
-              "SIN RESULTADO",
-              "NESSUN RISULTATO",
-              "SEM RESULTADO",
-              "НЕТ РЕЗУЛЬТАТА",
-              "НЕМАЄ РЕЗУЛЬТАТУ"
-            ]
-          },
-          "value_codes": {
-            "PASS": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA10392-1"
-              }
-            ],
-            "FAIL": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA25389-0"
-              }
-            ]
-          }
-        },
-        {
-          "code": "IQS-H Ct",
-          "label": "IQS-H Ct",
-          "result_type": "quantitative",
-          "sub_identity": "IQS-H&Ct"
-        },
-        {
-          "code": "IQS-H EndPt",
-          "label": "IQS-H EndPt",
-          "result_type": "quantitative",
-          "sub_identity": "IQS-H&EndPt"
-        },
-        {
-          "code": "IQS-L",
-          "label": "IQS-L",
-          "result_type": "qualitative",
-          "sub_identity": "IQS-L",
-          "values": ["PASS", "FAIL"],
-          "run_failure_values": ["NO RESULT"],
-          "translations": {
-            "NO RESULT": [
-              "PAS DE RÉSULTAT",
-              "KEIN ERGEBNIS",
-              "SIN RESULTADO",
-              "NESSUN RISULTATO",
-              "SEM RESULTADO",
-              "НЕТ РЕЗУЛЬТАТА",
-              "НЕМАЄ РЕЗУЛЬТАТУ"
-            ]
-          },
-          "value_codes": {
-            "PASS": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA10392-1"
-              }
-            ],
-            "FAIL": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA25389-0"
-              }
-            ]
-          }
-        },
-        {
-          "code": "IQS-L Ct",
-          "label": "IQS-L Ct",
-          "result_type": "quantitative",
-          "sub_identity": "IQS-L&Ct"
-        },
-        {
-          "code": "IQS-L EndPt",
-          "label": "IQS-L EndPt",
-          "result_type": "quantitative",
-          "sub_identity": "IQS-L&EndPt"
         }
       ],
       "assay": {
@@ -503,57 +413,6 @@
           "label": "SARS-CoV-2 EndPt",
           "result_type": "quantitative",
           "sub_identity": "SARS-CoV-2&EndPt"
-        },
-        {
-          "code": "SPC",
-          "label": "Sample processing control",
-          "result_type": "qualitative",
-          "sub_identity": "SPC",
-          "values": ["PASS", "FAIL", "NA"],
-          "run_failure_values": ["NO RESULT"],
-          "translations": {
-            "NO RESULT": [
-              "PAS DE RÉSULTAT",
-              "KEIN ERGEBNIS",
-              "SIN RESULTADO",
-              "NESSUN RISULTATO",
-              "SEM RESULTADO",
-              "НЕТ РЕЗУЛЬТАТА",
-              "НЕМАЄ РЕЗУЛЬТАТУ"
-            ]
-          },
-          "value_codes": {
-            "PASS": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA10392-1"
-              }
-            ],
-            "FAIL": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA25389-0"
-              }
-            ],
-            "NA": [
-              {
-                "system": "http://snomed.info/sct",
-                "code": "385432009"
-              }
-            ]
-          }
-        },
-        {
-          "code": "SPC Ct",
-          "label": "SPC Ct",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&Ct"
-        },
-        {
-          "code": "SPC EndPt",
-          "label": "SPC EndPt",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&EndPt"
         }
       ],
       "assay": {
@@ -811,57 +670,6 @@
           "label": "Flu A 2 EndPt",
           "result_type": "quantitative",
           "sub_identity": "Flu A 2&EndPt"
-        },
-        {
-          "code": "SPC",
-          "label": "Sample processing control",
-          "result_type": "qualitative",
-          "sub_identity": "SPC",
-          "values": ["PASS", "FAIL", "NA"],
-          "run_failure_values": ["NO RESULT"],
-          "translations": {
-            "NO RESULT": [
-              "PAS DE RÉSULTAT",
-              "KEIN ERGEBNIS",
-              "SIN RESULTADO",
-              "NESSUN RISULTATO",
-              "SEM RESULTADO",
-              "НЕТ РЕЗУЛЬТАТА",
-              "НЕМАЄ РЕЗУЛЬТАТУ"
-            ]
-          },
-          "value_codes": {
-            "PASS": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA10392-1"
-              }
-            ],
-            "FAIL": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA25389-0"
-              }
-            ],
-            "NA": [
-              {
-                "system": "http://snomed.info/sct",
-                "code": "385432009"
-              }
-            ]
-          }
-        },
-        {
-          "code": "SPC Ct",
-          "label": "SPC Ct",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&Ct"
-        },
-        {
-          "code": "SPC EndPt",
-          "label": "SPC EndPt",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&EndPt"
         }
       ],
       "assay": {
@@ -1040,57 +848,6 @@
           "label": "Flu B EndPt",
           "result_type": "quantitative",
           "sub_identity": "Flu B&EndPt"
-        },
-        {
-          "code": "SPC",
-          "label": "Sample processing control",
-          "result_type": "qualitative",
-          "sub_identity": "SPC",
-          "values": ["PASS", "FAIL", "NA"],
-          "run_failure_values": ["NO RESULT"],
-          "translations": {
-            "NO RESULT": [
-              "PAS DE RÉSULTAT",
-              "KEIN ERGEBNIS",
-              "SIN RESULTADO",
-              "NESSUN RISULTATO",
-              "SEM RESULTADO",
-              "НЕТ РЕЗУЛЬТАТА",
-              "НЕМАЄ РЕЗУЛЬТАТУ"
-            ]
-          },
-          "value_codes": {
-            "PASS": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA10392-1"
-              }
-            ],
-            "FAIL": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA25389-0"
-              }
-            ],
-            "NA": [
-              {
-                "system": "http://snomed.info/sct",
-                "code": "385432009"
-              }
-            ]
-          }
-        },
-        {
-          "code": "SPC Ct",
-          "label": "SPC Ct",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&Ct"
-        },
-        {
-          "code": "SPC EndPt",
-          "label": "SPC EndPt",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&EndPt"
         }
       ],
       "assay": {
@@ -1269,57 +1026,6 @@
           "label": "RSV EndPt",
           "result_type": "quantitative",
           "sub_identity": "RSV&EndPt"
-        },
-        {
-          "code": "SPC",
-          "label": "Sample processing control",
-          "result_type": "qualitative",
-          "sub_identity": "SPC",
-          "values": ["PASS", "FAIL", "NA"],
-          "run_failure_values": ["NO RESULT"],
-          "translations": {
-            "NO RESULT": [
-              "PAS DE RÉSULTAT",
-              "KEIN ERGEBNIS",
-              "SIN RESULTADO",
-              "NESSUN RISULTATO",
-              "SEM RESULTADO",
-              "НЕТ РЕЗУЛЬТАТА",
-              "НЕМАЄ РЕЗУЛЬТАТУ"
-            ]
-          },
-          "value_codes": {
-            "PASS": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA10392-1"
-              }
-            ],
-            "FAIL": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA25389-0"
-              }
-            ],
-            "NA": [
-              {
-                "system": "http://snomed.info/sct",
-                "code": "385432009"
-              }
-            ]
-          }
-        },
-        {
-          "code": "SPC Ct",
-          "label": "SPC Ct",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&Ct"
-        },
-        {
-          "code": "SPC EndPt",
-          "label": "SPC EndPt",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&EndPt"
         }
       ],
       "assay": {
@@ -1498,57 +1204,6 @@
           "label": "SARS-CoV-2 EndPt",
           "result_type": "quantitative",
           "sub_identity": "SARS-CoV-2&EndPt"
-        },
-        {
-          "code": "SPC",
-          "label": "Sample processing control",
-          "result_type": "qualitative",
-          "sub_identity": "SPC",
-          "values": ["PASS", "FAIL", "NA"],
-          "run_failure_values": ["NO RESULT"],
-          "translations": {
-            "NO RESULT": [
-              "PAS DE RÉSULTAT",
-              "KEIN ERGEBNIS",
-              "SIN RESULTADO",
-              "NESSUN RISULTATO",
-              "SEM RESULTADO",
-              "НЕТ РЕЗУЛЬТАТА",
-              "НЕМАЄ РЕЗУЛЬТАТУ"
-            ]
-          },
-          "value_codes": {
-            "PASS": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA10392-1"
-              }
-            ],
-            "FAIL": [
-              {
-                "system": "http://loinc.org",
-                "code": "LA25389-0"
-              }
-            ],
-            "NA": [
-              {
-                "system": "http://snomed.info/sct",
-                "code": "385432009"
-              }
-            ]
-          }
-        },
-        {
-          "code": "SPC Ct",
-          "label": "SPC Ct",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&Ct"
-        },
-        {
-          "code": "SPC EndPt",
-          "label": "SPC EndPt",
-          "result_type": "quantitative",
-          "sub_identity": "SPC&EndPt"
         }
       ],
       "assay": {
@@ -1581,6 +1236,25 @@
       }
     }
   ],
+  "sample_flags": {
+    "raisedValue": "FAIL",
+    "codes": [
+      "IQS-H",
+      "IQS-H&Ct",
+      "IQS-H&EndPt",
+      "IQS-L",
+      "IQS-L&Ct",
+      "IQS-L&EndPt",
+      "SPC",
+      "SPC&Ct",
+      "SPC&EndPt"
+    ],
+    "names": {
+      "SPC": "Sample processing control failed",
+      "IQS-H": "High internal quantitation standard failed",
+      "IQS-L": "Low internal quantitation standard failed"
+    }
+  },
   "configDefaults": {
     "dataFlow": "RESULTS_ONLY",
     "connectionRole": "SERVER",
@@ -1754,6 +1428,6 @@
     "status": "ACTIVE",
     "publishedAt": "2026-10-06T00:00:00Z",
     "publishedBy": "distribution",
-    "revisionFingerprint": "sha256:1e2d53f6b797b25dbcd3c6947c5924ec1176b70b5dec2846fda691a6e74550ea"
+    "revisionFingerprint": "sha256:5d2ffee041a71c7d220fe5dda60f69c17a3fef357861fbfa83772c4f916eeca2"
   }
 }

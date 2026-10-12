@@ -10,6 +10,7 @@ import org.itech.ahb.connection.AnalyzerRuntimeRegistry.AnalyzerEntry;
 import org.itech.ahb.fhir.TabularFileLayout;
 import org.itech.ahb.profile.ControlResultRecognition;
 import org.itech.ahb.profile.ProfileFingerprintService;
+import org.itech.ahb.profile.SampleFlags;
 import org.itech.ahb.profile.TabularResultValueSelection;
 
 /** Immutable receipt evidence, not a second configurable profile or connection authority. */
@@ -32,7 +33,9 @@ public record FileReceiptContext(
   TabularResultValueSelection resultSelection,
   ControlResultRecognition recognition,
   Map<String, String> codeToLoinc,
-  @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, String> profileCodeByInstrumentCode
+  @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, String> profileCodeByInstrumentCode,
+  @JsonInclude(JsonInclude.Include.NON_EMPTY) Map<String, String> testCodeValues,
+  @JsonInclude(JsonInclude.Include.NON_NULL) SampleFlags sampleFlags
 ) {
   public FileReceiptContext {
     if (version != 1) throw new IllegalArgumentException("Unsupported FILE receipt context version: " + version);
@@ -47,6 +50,7 @@ public record FileReceiptContext(
     profileCodeByInstrumentCode = profileCodeByInstrumentCode == null
       ? Map.of()
       : Map.copyOf(profileCodeByInstrumentCode);
+    testCodeValues = testCodeValues == null ? Map.of() : Map.copyOf(testCodeValues);
   }
 
   public static FileReceiptContext capture(Path path, AnalyzerEntry entry, String explicitTestCode) {
@@ -74,8 +78,15 @@ public record FileReceiptContext(
       entry.getTabularResultValueSelection(),
       entry.getControlResultRecognition(),
       entry.getCodeToLoinc(),
-      entry.getResultReading() == null ? Map.of() : entry.getResultReading().profileCodeByInstrumentCode()
+      entry.getResultReading() == null ? Map.of() : entry.getResultReading().profileCodeByInstrumentCode(),
+      entry.getTestCodeValues(),
+      flagsOf(entry.getResultReading())
     );
+  }
+
+  /** The flags the profile declares, or nothing, so a profile without flags keeps its interpretation hash. */
+  private static SampleFlags flagsOf(org.itech.ahb.profile.ResultReading reading) {
+    return reading == null || reading.sampleFlags().codes().isEmpty() ? null : reading.sampleFlags();
   }
 
   /** Renaming the source is not a reinterpretation. Parser choices, assay and profile pin are. */

@@ -395,6 +395,7 @@ public final class BridgeAnalyzerConnectionRuntime implements AnalyzerConnection
     entry.setIdentifierPattern(nullableText(profile, "identifier_pattern"));
     entry.setFilePattern(nullableText(values, "filePattern"));
     entry.setColumnMappings(textMap(profile.path("column_mapping")));
+    entry.setTestCodeValues(textMap(profile.path("test_code_values")));
     entry.setFileFormat(nullableText(values, "fileFormat"));
     // Whitespace is meaningful for a delimiter (notably a TSV tab).
     entry.setDelimiter(values.path("delimiter").isTextual() ? values.path("delimiter").asText() : null);

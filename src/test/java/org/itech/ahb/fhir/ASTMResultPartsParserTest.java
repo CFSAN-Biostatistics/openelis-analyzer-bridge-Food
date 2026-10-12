@@ -53,20 +53,10 @@ class ASTMResultPartsParserTest {
     );
 
     assertThat(parsed.accessionNumber()).isEqualTo("HIV-1 30cp");
-    // A record with neither a call nor a number says nothing, so it is not a result.
-    assertThat(subIdentities(parsed)).containsExactly(
-      "",
-      "HIV-1",
-      "HIV-1&Ct",
-      "HIV-1&EndPt",
-      "HIV-1&Delta Ct",
-      "IQS-H",
-      "IQS-H&Ct",
-      "IQS-H&EndPt",
-      "IQS-L",
-      "IQS-L&Ct",
-      "IQS-L&EndPt"
-    );
+    // A record with neither a call nor a number says nothing, so it is not a result; the internal
+    // quantitation standards are flags on the sample, and a passing one raises none.
+    assertThat(subIdentities(parsed)).containsExactly("", "HIV-1", "HIV-1&Ct", "HIV-1&EndPt", "HIV-1&Delta Ct");
+    assertThat(parsed.sampleFlags()).isEmpty();
     RecordParts main = parsed.results().get(0).parts();
     assertThat(parsed.results().get(0).testCode()).isEqualTo("HIVVL");
     assertThat(main.call()).isEqualTo("DETECTED");
@@ -153,7 +143,9 @@ class ASTMResultPartsParserTest {
     );
 
     List<AnalyzerResult> results = parsed.results();
-    assertThat(subIdentities(parsed)).containsExactly("", "HIV-1", "HIV-1&Ct", "IQS-H");
+    // The internal standard is a flag on the sample, raised only on FAIL, so NO RESULT raises none.
+    assertThat(subIdentities(parsed)).containsExactly("", "HIV-1", "HIV-1&Ct");
+    assertThat(parsed.sampleFlags()).isEmpty();
     RecordParts main = results.get(0).parts();
     assertThat(main.call()).isEqualTo("ERROR");
     assertThat(main.runFailed()).isTrue();
@@ -164,7 +156,6 @@ class ASTMResultPartsParserTest {
     assertThat(results.get(1).parts().runFailed()).isTrue();
     assertThat(results.get(2).parts().runFailed()).isFalse();
     assertThat(results.get(2).parts().number()).isEqualTo("0.0");
-    assertThat(results.get(3).parts().runFailed()).isTrue();
   }
 
   @Test
@@ -253,6 +244,57 @@ class ASTMResultPartsParserTest {
 
     assertThat(parsed.results()).extracting(AnalyzerResult::testCode).containsOnly("HIVVL");
     assertThat(parsed.sampleFlags()).containsExactly(new SampleFlag("LIPEMIA", "Lipemic sample", "T"));
+  }
+
+  @Test
+  void anInternalControlPartTheProfileNamesIsAFlagOnTheSampleAndNeverAResult() throws Exception {
+    ObjectNode profile = BaselineProfileFixtures.genexpertHivViralLoad(new ObjectMapper());
+    ObjectNode flags = profile.putObject("sample_flags");
+    flags.put("raisedValue", "FAIL");
+    flags.putArray("codes").add("IQS-H").add("IQS-H&Ct").add("IQS-L").add("IQS-L&Ct");
+    flags.putObject("names").put("IQS-H", "High internal quantitation standard failed");
+
+    ParsedResults parsed = ASTMResultParser.parseRaw(
+      header() +
+      "O|1|ACC-1||^^^HIVVL|R|20221115035816|||||||||ORH||||||||||F\r" +
+      main("NOT DETECTED^", "40.00 to 10000000.00", "A") +
+      "R|7|^^^HIVVL^^^IQS-H^|FAIL^|||\r" +
+      "R|8|^^^HIVVL^^^IQS-H^Ct|^31.2|||\r" +
+      "R|9|^^^HIVVL^^^IQS-L^|PASS^|||\r" +
+      "R|10|^^^HIVVL^^^IQS-L^Ct|^29.3|||\r" +
+      "L|1|N\r",
+      ControlResultRecognition.none(),
+      AstmResultRecordSelection.all(),
+      ResultReading.fromProfile(profile)
+    );
+
+    assertThat(subIdentities(parsed)).doesNotContain("IQS-H", "IQS-H&Ct", "IQS-L", "IQS-L&Ct");
+    assertThat(parsed.sampleFlags()).containsExactly(
+      new SampleFlag("IQS-H", "High internal quantitation standard failed", "FAIL")
+    );
+  }
+
+  @Test
+  void aControlEveryTestOnTheCartridgeReportsIsOneFlagOnTheSample() throws Exception {
+    ObjectNode profile = BaselineProfileFixtures.genexpertHivViralLoad(new ObjectMapper());
+    ObjectNode flags = profile.putObject("sample_flags");
+    flags.put("raisedValue", "FAIL");
+    flags.putArray("codes").add("SPC");
+    flags.putObject("names").put("SPC", "Sample processing control failed");
+
+    ParsedResults parsed = ASTMResultParser.parseRaw(
+      header() +
+      "O|1|ACC-1||^^^HIVVL|R|20221115035816|||||||||ORH||||||||||F\r" +
+      main("NOT DETECTED^", "40.00 to 10000000.00", "A") +
+      "R|7|^^^HIVVL^^^SPC^|FAIL^|||\r" +
+      "R|8|^^^OTHER^^^SPC^|FAIL^|||\r" +
+      "L|1|N\r",
+      ControlResultRecognition.none(),
+      AstmResultRecordSelection.all(),
+      ResultReading.fromProfile(profile)
+    );
+
+    assertThat(parsed.sampleFlags()).containsExactly(new SampleFlag("SPC", "Sample processing control failed", "FAIL"));
   }
 
   private static ParsedResults parse(String message) {

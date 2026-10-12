@@ -177,6 +177,23 @@ class AnalyzerProfileCatalogTest {
   }
 
   @Test
+  void aDraftMissingAPartNamesTheStepThatSavesIt() throws Exception {
+    var draft = catalog.createDraft("Site Fluoro Profile", "profile-creator");
+    String profileId = draft.profile().path("profileMeta").path("id").asText();
+    assertThat(draft.validationIssues()).containsExactly(
+      "Save control recognition before publishing.",
+      "Save the profile settings before publishing."
+    );
+
+    ObjectNode settingsSaved = authoredFixture("analyzer-profile-file.json", profileId, "Site Fluoro Profile");
+    settingsSaved.remove("controlResultRecognition");
+
+    assertThat(
+      catalog.updateDraft(draft.draftId(), settingsSaved, "profile-editor").validationIssues()
+    ).containsExactly("Save control recognition before publishing.");
+  }
+
+  @Test
   void duplicateCreatesAnIndependentDraftWithLineageAndUnchangedProfileData() throws Exception {
     ObjectNode source = catalog.require("genexpert-astm", 1).profile();
 

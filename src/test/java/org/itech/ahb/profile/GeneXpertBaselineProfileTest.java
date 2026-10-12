@@ -40,7 +40,7 @@ class GeneXpertBaselineProfileTest {
   }
 
   @Test
-  void flusAndRsvCarryTheLivdCodesForThePlusAssayAndControlsAreCoded() throws Exception {
+  void flusAndRsvCarryTheLivdCodesForThePlusAssayAndTheCartridgesControlsAreSampleFlags() throws Exception {
     ObjectNode profile = profile();
     java.util.Map<String, String> loincByCode = new java.util.HashMap<>();
     profile
@@ -52,24 +52,21 @@ class GeneXpertBaselineProfileTest {
       .containsEntry("FLUB", "85478-6")
       .containsEntry("RSV", "85479-4");
 
-    java.util.List<String> controls = new java.util.ArrayList<>();
+    // The cartridge's internal controls are warnings about the sample, raised on FAIL, never parts of a test.
     for (JsonNode test : profile.path("default_test_mappings")) {
       for (JsonNode component : test.path("components")) {
-        String code = component.path("code").asText();
-        if (!Set.of("SPC", "IQS-H", "IQS-L").contains(code)) continue;
-        controls.add(test.path("test_code").asText() + " " + code);
-        component
-          .path("values")
-          .forEach(
-            value ->
-              assertThat(component.path("value_codes").path(value.asText()).size())
-                .as(code + " " + value.asText() + " has a standard code")
-                .isPositive()
-          );
-        assertThat(component.path("run_failure_values").toString()).contains("NO RESULT");
+        assertThat(component.path("code").asText())
+          .as(test.path("test_code").asText())
+          .doesNotStartWith("SPC")
+          .doesNotStartWith("IQS-");
       }
     }
-    assertThat(controls).contains("HIVVL IQS-H", "HIVVL IQS-L", "SARSCOV2 SPC", "SARSCOV2_3 SPC");
+    JsonNode flags = profile.path("sample_flags");
+    assertThat(flags.path("raisedValue").asText()).isEqualTo("FAIL");
+    java.util.List<String> codes = new java.util.ArrayList<>();
+    flags.path("codes").forEach(code -> codes.add(code.asText()));
+    assertThat(codes).contains("SPC", "SPC&Ct", "SPC&EndPt", "IQS-H", "IQS-H&Ct", "IQS-L", "IQS-L&EndPt");
+    assertThat(flags.path("names").path("SPC").asText()).isEqualTo("Sample processing control failed");
   }
 
   @Test

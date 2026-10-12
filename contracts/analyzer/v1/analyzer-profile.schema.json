@@ -94,6 +94,13 @@
       "uniqueItems": true,
       "items": { "enum": ["result", "ctValue", "interpretation"] }
     },
+    "test_code_values": {
+      "description": "What each value of the column mapped to testCode means, as a profile test code. A value not listed is kept as the file carries it.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/nonBlank" },
+      "additionalProperties": { "$ref": "#/$defs/nonBlank" }
+    },
     "sheet_detection": { "$ref": "#/$defs/sheetDetection" },
     "default_test_mappings": {
       "type": "array",

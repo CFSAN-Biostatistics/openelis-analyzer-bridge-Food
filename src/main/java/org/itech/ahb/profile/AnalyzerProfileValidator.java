@@ -2,6 +2,7 @@ package org.itech.ahb.profile;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.JsonNodePath;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
@@ -19,6 +20,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -59,13 +61,32 @@ final class AnalyzerProfileValidator {
   }
 
   List<String> validationIssues(JsonNode profile) {
-    List<String> failures = new ArrayList<>(
-      schema.validate(profile).stream().map(ValidationMessage::getMessage).toList()
-    );
+    return issues(profile, ValidationMessage::getMessage);
+  }
+
+  /** The issues a draft shows its author: a part not saved yet names the step that saves it. */
+  List<String> draftIssues(JsonNode profile) {
+    return issues(profile, AnalyzerProfileValidator::draftIssue);
+  }
+
+  private static String draftIssue(ValidationMessage message) {
+    if (!"required".equals(message.getType())) {
+      return message.getMessage();
+    }
+    JsonNodePath location = message.getInstanceLocation();
+    String part = location.getNameCount() == 0 ? message.getProperty() : location.getName(0);
+    return "controlResultRecognition".equals(part)
+      ? "Save control recognition before publishing."
+      : "Save the profile settings before publishing.";
+  }
+
+  private List<String> issues(JsonNode profile, Function<ValidationMessage, String> wording) {
+    List<String> failures = new ArrayList<>(schema.validate(profile).stream().map(wording).distinct().toList());
     if (failures.isEmpty()) {
       validateConnectionFields(profile, failures);
       validateFilePattern(profile, failures);
       validateTabularResultSelection(profile, failures);
+      validateTestCodeValues(profile, failures);
       validateRecordKinds(profile, failures);
       validateMappingIdentities(profile, failures);
       validateResultDescriptions(profile, failures);
@@ -156,6 +177,37 @@ final class AnalyzerProfileValidator {
       .forEach(field -> {
         if (!mappedSemanticFields.contains(field)) {
           failures.add("$.result_value_order selects " + field + " but $.column_mapping has no matching source column");
+        }
+      });
+  }
+
+  /** A FILE column value the profile translates must name a declared test or a sample flag. */
+  private void validateTestCodeValues(JsonNode profile, List<String> failures) {
+    JsonNode values = profile.path("test_code_values");
+    if (!"FILE".equals(profile.path("protocol").path("name").asText()) || values.isMissingNode()) {
+      return;
+    }
+    boolean testCodeColumn = false;
+    for (JsonNode meaning : profile.path("column_mapping")) {
+      testCodeColumn |= "testCode".equals(meaning.asText());
+    }
+    if (!testCodeColumn) {
+      failures.add("$.test_code_values needs a column mapped to testCode in $.column_mapping");
+    }
+    Set<String> declared = new HashSet<>();
+    profile.path("default_test_mappings").forEach(mapping -> declared.add(mapping.path("test_code").asText()));
+    profile.path("sample_flags").path("codes").forEach(code -> declared.add(code.asText()));
+    values
+      .fields()
+      .forEachRemaining(entry -> {
+        if (!declared.contains(entry.getValue().asText())) {
+          failures.add(
+            "$.test_code_values." +
+            entry.getKey() +
+            " names " +
+            entry.getValue().asText() +
+            ", which neither $.default_test_mappings nor $.sample_flags declares"
+          );
         }
       });
   }
