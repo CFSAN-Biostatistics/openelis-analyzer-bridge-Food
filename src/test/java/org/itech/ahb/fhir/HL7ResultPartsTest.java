@@ -116,6 +116,44 @@ class HL7ResultPartsTest {
   }
 
   @Test
+  void aRaisedAlarmTheProfileNamesTravelsWithTheSampleAndIsNeverAResult() throws IOException {
+    ParsedResults parsed = HL7ResultParser.parse(
+      manualMessage(),
+      ControlResultRecognition.none(),
+      Hl7SpecimenPosition.PRECEDING,
+      selection("ALL"),
+      readingWithAlarms("12014", "15180-3", "12018")
+    );
+
+    assertThat(byCode(parsed)).doesNotContainKeys("12014", "15180-3").containsKeys("6690-2", "718-7");
+    assertThat(parsed.sampleFlags()).containsExactly(
+      new SampleFlag("12014", "Anemia", "T"),
+      new SampleFlag("15180-3", "Hypochromia", "T")
+    );
+  }
+
+  @Test
+  void anAlarmNotRaisedSaysNothing() {
+    List<String> message = List.of(
+      "MSH|^~\\&|BC-5380|Mindray|||20080617143943||ORU^R01|1|P|2.3.1",
+      "OBR|1||S-1|00001^Automated Count^99MRC",
+      "OBX|1|NM|6690-2^WBC^LN||9.81|10*9/L|4.00-10.00|N|||F",
+      "OBX|2|IS|12014^Anemia^99MRC||F||||||F"
+    );
+
+    ParsedResults parsed = HL7ResultParser.parse(
+      message,
+      ControlResultRecognition.none(),
+      Hl7SpecimenPosition.PRECEDING,
+      selection("ALL"),
+      readingWithAlarms("12014")
+    );
+
+    assertThat(byCode(parsed)).containsOnlyKeys("6690-2");
+    assertThat(parsed.sampleFlags()).isEmpty();
+  }
+
+  @Test
   void aStructuredNumericValueKeepsItsComparatorAndNumberAndARatioStaysText() {
     List<AnalyzerResult> results = HL7ResultParser.parse(
       List.of(
@@ -170,6 +208,17 @@ class HL7ResultPartsTest {
       selection,
       reading()
     );
+  }
+
+  private static ResultReading readingWithAlarms(String... codes) {
+    ObjectNode profile = JSON.createObjectNode();
+    profile.putObject("protocol").put("name", "HL7");
+    ObjectNode overrides = profile.putObject("configDefaults").putObject("extractionOverrides");
+    PARTS.forEach(overrides.putObject("resultParts")::put);
+    ObjectNode flags = profile.putObject("sample_flags");
+    flags.put("raisedValue", "T");
+    Arrays.stream(codes).forEach(flags.putArray("codes")::add);
+    return ResultReading.fromProfile(profile);
   }
 
   private static Map<String, AnalyzerResult> byCode(ParsedResults parsed) {

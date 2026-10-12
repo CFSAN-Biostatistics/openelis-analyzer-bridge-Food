@@ -18,6 +18,7 @@ import org.itech.ahb.profile.ControlRecognitionRule;
 import org.itech.ahb.profile.ControlResultRecognition;
 import org.itech.ahb.profile.ControlResultRecognitionEvaluator;
 import org.itech.ahb.profile.ResultReading;
+import org.itech.ahb.profile.SampleFlags;
 
 /**
  * Extracts lab results from ASTM LIS2-A2 messages.
@@ -80,6 +81,7 @@ public class ASTMResultParser {
         String accession = null;
         ControlResultRecognitionEvaluator.Assessment recognitionAssessment = null;
         List<AnalyzerResult> results = new ArrayList<>();
+        List<SampleFlag> sampleFlags = new ArrayList<>();
         InstrumentPatient patient = null;
         String specimenDescriptor = null;
         // The result a following C record belongs to; null after a record that said nothing.
@@ -121,7 +123,14 @@ public class ASTMResultParser {
                 }
                 case "R" -> {
                     commentTarget = -1;
-                    if (accession != null) {
+                    SampleFlags.Reported flag = reading == null || parts == null
+                            ? null
+                            : flagOf(line.split(Pattern.quote(FIELD_DELIMITER), -1), parts, reading);
+                    if (flag != null) {
+                        if (flag.raised() && accession != null) {
+                            sampleFlags.add(new SampleFlag(flag.code(), flag.name(), flag.value()));
+                        }
+                    } else if (accession != null) {
                         AnalyzerResult result = parts == null
                                 ? parseResultRecord(line, resultRecordSelection)
                                 : parseResultRecord(line, resultRecordSelection, parts, reading);
@@ -169,7 +178,7 @@ public class ASTMResultParser {
 
         return results.isEmpty()
                 ? null
-                : new HL7ResultParser.ParsedResults(accession, results, patient, specimenDescriptor);
+                : new HL7ResultParser.ParsedResults(accession, results, patient, specimenDescriptor, sampleFlags);
     }
 
     /**
@@ -248,6 +257,16 @@ public class ASTMResultParser {
      * Extract segment type identifier.
      * Ported from GenericASTMLineInserter.getSegmentType().
      */
+    /** The flag an R record carries: its code, the name beside the code, and its call or number. */
+    private static SampleFlags.Reported flagOf(String[] fields, AstmResultParts parts, ResultReading reading) {
+        String value = AstmResultParts.read(parts.call(), fields);
+        if (value.isEmpty()) value = AstmResultParts.read(parts.number(), fields);
+        return reading.sampleFlags().read(
+                AstmResultParts.read(parts.testCode(), fields),
+                AstmResultParts.read(parts.assayName(), fields),
+                value);
+    }
+
     private static String getSegmentType(String line) {
         int pos = line.indexOf(FIELD_DELIMITER);
         if (pos > 0) return line.substring(0, pos);

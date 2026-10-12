@@ -19,6 +19,7 @@ import org.itech.ahb.profile.Hl7ResultParts;
 import org.itech.ahb.profile.Hl7ResultRecordSelection;
 import org.itech.ahb.profile.Hl7SpecimenPosition;
 import org.itech.ahb.profile.ResultReading;
+import org.itech.ahb.profile.SampleFlags;
 
 /**
  * Extracts lab results from HL7 v2 ORU^R01 messages.
@@ -89,6 +90,7 @@ public class HL7ResultParser {
     String accession = null;
     SegmentFields fieldValues = new SegmentFields();
     List<AnalyzerResult> results = new ArrayList<>();
+    List<SampleFlag> sampleFlags = new ArrayList<>();
     Delimiters delimiters = new Delimiters('|', '^', '~', '&');
     PendingObservation pending = null;
     InstrumentPatient patient = null;
@@ -142,7 +144,20 @@ public class HL7ResultParser {
         }
       }
 
-      if ("OBX".equals(segment) && resultRecordSelection.includes(fieldValues)) {
+      SampleFlags.Reported flag = "OBX".equals(segment) && reading != null && parts != null
+        ? reading
+          .sampleFlags()
+          .read(
+            Hl7ResultParts.read(parts.testCode(), fieldValues),
+            Hl7ResultParts.read(nameBeside(parts.testCode()), fieldValues),
+            Hl7ResultParts.read(parts.value(), fieldValues)
+          )
+        : null;
+      if (flag != null) {
+        if (flag.raised()) {
+          sampleFlags.add(new SampleFlag(flag.code(), flag.name(), flag.value()));
+        }
+      } else if ("OBX".equals(segment) && resultRecordSelection.includes(fieldValues)) {
         AnalyzerResult result = parts == null
           ? parseObxSegment(line, delimiters)
           : readObservation(fieldValues, parts, reading, delimiters);
@@ -165,7 +180,7 @@ public class HL7ResultParser {
     // Recognition already used instrument evidence, never this display-only fallback.
     if (accession == null) accession = "HL7-UNKNOWN";
 
-    return results.isEmpty() ? null : new ParsedResults(accession, results, patient, specimenDescriptor);
+    return results.isEmpty() ? null : new ParsedResults(accession, results, patient, specimenDescriptor, sampleFlags);
   }
 
   private record PendingObservation(AnalyzerResult result, String specimenId, SegmentFields fields) {
@@ -490,18 +505,66 @@ public class HL7ResultParser {
     return null;
   }
 
+  /** The field holding the instrument's name for a code: the component after the code's (OBX-3.1, OBX-3.2). */
+  static String nameBeside(String codeField) {
+    if (codeField == null) {
+      return null;
+    }
+    String[] parts = codeField.split("\\.");
+    if (parts.length != 3) {
+      return null;
+    }
+    return parts[0] + "." + parts[1] + "." + (Integer.parseInt(parts[2]) + 1);
+  }
+
   /**
    * @param patient the patient the instrument reported, when its profile says where to read one
    * @param specimenDescriptor the instrument's own description of the specimen, as sent
+   * @param sampleFlags the warnings the instrument raised about the sample, in the order sent
    */
   public record ParsedResults(
     String accessionNumber,
     List<AnalyzerResult> results,
     InstrumentPatient patient,
-    String specimenDescriptor
+    String specimenDescriptor,
+    List<SampleFlag> sampleFlags
   ) {
+    public ParsedResults {
+      sampleFlags = sampleFlags == null ? List.of() : List.copyOf(sampleFlags);
+    }
+
     public ParsedResults(String accessionNumber, List<AnalyzerResult> results) {
-      this(accessionNumber, results, null, null);
+      this(accessionNumber, results, null, null, List.of());
+    }
+
+    public ParsedResults(
+      String accessionNumber,
+      List<AnalyzerResult> results,
+      InstrumentPatient patient,
+      String specimenDescriptor
+    ) {
+      this(accessionNumber, results, patient, specimenDescriptor, List.of());
+    }
+
+    /**
+     * A file's rows that the profile names as warnings about the sample, taken out of the results:
+     * a raised one is a flag on the sample, one not raised says nothing.
+     */
+    public ParsedResults withFileSampleFlags(org.itech.ahb.profile.SampleFlags flags) {
+      if (flags == null || flags.codes().isEmpty()) {
+        return this;
+      }
+      List<AnalyzerResult> kept = new java.util.ArrayList<>();
+      List<SampleFlag> raised = new java.util.ArrayList<>(sampleFlags);
+      for (AnalyzerResult result : results) {
+        org.itech.ahb.profile.SampleFlags.Reported flag = flags.read(result.testCode(), "", result.value());
+        if (flag == null) {
+          kept.add(result);
+        } else if (flag.raised()) {
+          raised.add(new SampleFlag(flag.code(), flag.name(), flag.value()));
+        }
+      }
+      return new ParsedResults(accessionNumber, kept, patient, specimenDescriptor, raised);
     }
 
     /** These results under the profile's own codes, where the connection sets other codes for its instrument. */
@@ -513,7 +576,8 @@ public class HL7ResultParser {
         accessionNumber,
         results.stream().map(result -> result.withTestCode(reading.profileCode(result.testCode()))).toList(),
         patient,
-        specimenDescriptor
+        specimenDescriptor,
+        sampleFlags
       );
     }
   }

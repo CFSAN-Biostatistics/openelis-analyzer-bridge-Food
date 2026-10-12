@@ -103,6 +103,31 @@ class AnalyzerProfileValidatorTest {
   }
 
   @Test
+  void aCodeIsOfOneKindOnly() throws Exception {
+    ObjectNode profile = astmProfile();
+    String test = profile.path("default_test_mappings").get(0).path("test_code").asText();
+    ObjectNode flags = profile.putObject("sample_flags");
+    flags.put("raisedValue", "T");
+    flags.putArray("codes").add(test);
+
+    assertThat(validator.validationIssues(profile)).contains(
+      "$.sample_flags.codes lists " + test + ", which $.default_test_mappings declares as a test"
+    );
+  }
+
+  @Test
+  void aFileProfileNamesEveryFlagBecauseAFileCarriesNoName() throws Exception {
+    ObjectNode profile = fileProfile();
+    ObjectNode flags = profile.putObject("sample_flags");
+    flags.put("raisedValue", "Invalid");
+    flags.putArray("codes").add("IC");
+
+    assertThat(validator.validationIssues(profile)).contains(
+      "$.sample_flags.names must name IC: a file carries no name for a flag"
+    );
+  }
+
+  @Test
   void aColumnOnlyFileProfileDefaultsToTheResultSemantic() throws Exception {
     ObjectNode profile = fileProfile();
     profile.remove("result_value_order");
