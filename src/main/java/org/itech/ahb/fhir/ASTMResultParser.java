@@ -18,6 +18,7 @@ import org.itech.ahb.profile.ControlRecognitionRule;
 import org.itech.ahb.profile.ControlResultRecognition;
 import org.itech.ahb.profile.ControlResultRecognitionEvaluator;
 import org.itech.ahb.profile.ResultReading;
+import org.itech.ahb.profile.SampleFlags;
 
 /**
  * Extracts lab results from ASTM LIS2-A2 messages.
@@ -80,6 +81,7 @@ public class ASTMResultParser {
         String accession = null;
         ControlResultRecognitionEvaluator.Assessment recognitionAssessment = null;
         List<AnalyzerResult> results = new ArrayList<>();
+        List<SampleFlag> sampleFlags = new ArrayList<>();
         InstrumentPatient patient = null;
         String specimenDescriptor = null;
         // The result a following C record belongs to; null after a record that said nothing.
@@ -121,7 +123,16 @@ public class ASTMResultParser {
                 }
                 case "R" -> {
                     commentTarget = -1;
-                    if (accession != null) {
+                    SampleFlags.Reported flag = reading == null || parts == null
+                            ? null
+                            : flagOf(line.split(Pattern.quote(FIELD_DELIMITER), -1), parts, reading);
+                    if (flag != null) {
+                        SampleFlag raised = new SampleFlag(flag.code(), flag.name(), flag.value());
+                        // A cartridge's control is reported under each of its tests; it is one flag on the sample.
+                        if (flag.raised() && accession != null && !sampleFlags.contains(raised)) {
+                            sampleFlags.add(raised);
+                        }
+                    } else if (accession != null) {
                         AnalyzerResult result = parts == null
                                 ? parseResultRecord(line, resultRecordSelection)
                                 : parseResultRecord(line, resultRecordSelection, parts, reading);
@@ -169,7 +180,7 @@ public class ASTMResultParser {
 
         return results.isEmpty()
                 ? null
-                : new HL7ResultParser.ParsedResults(accession, results, patient, specimenDescriptor);
+                : new HL7ResultParser.ParsedResults(accession, results, patient, specimenDescriptor, sampleFlags);
     }
 
     /**
@@ -248,6 +259,24 @@ public class ASTMResultParser {
      * Extract segment type identifier.
      * Ported from GenericASTMLineInserter.getSegmentType().
      */
+    /**
+     * The flag an R record carries: its code, the name beside the code, and its call or number. A
+     * part of a test (a cartridge's internal control) is named by its identity within the test, as
+     * the profile's parts name it; any other record by its test code.
+     */
+    private static SampleFlags.Reported flagOf(String[] fields, AstmResultParts parts, ResultReading reading) {
+        String value = AstmResultParts.read(parts.call(), fields);
+        if (value.isEmpty()) value = AstmResultParts.read(parts.number(), fields);
+        String assayName = AstmResultParts.read(parts.assayName(), fields);
+        String analyte = assayName.isEmpty() ? AstmResultParts.read(parts.analyte(), fields) : "";
+        String complement = AstmResultParts.read(parts.complement(), fields);
+        String subIdentity = complement.isEmpty() ? analyte : analyte + "&" + complement;
+        SampleFlags.Reported part = subIdentity.isEmpty() ? null : reading.sampleFlags().read(subIdentity, null, value);
+        return part != null
+                ? part
+                : reading.sampleFlags().read(AstmResultParts.read(parts.testCode(), fields), assayName, value);
+    }
+
     private static String getSegmentType(String line) {
         int pos = line.indexOf(FIELD_DELIMITER);
         if (pos > 0) return line.substring(0, pos);

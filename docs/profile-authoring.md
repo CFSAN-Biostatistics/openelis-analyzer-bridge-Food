@@ -60,6 +60,21 @@ record the component receives, in the vendor's HL7 sub-ID notation: the analyte 
 names (`HIV-1&Ct`, `&LOG`). The component with no `sub_identity` takes the main record's call. A
 qualitative component that has a `sub_identity` declares its `values`.
 
+## A file's test-code column
+
+A tabular file names each row's test in the column `column_mapping` marks `testCode`, or, when
+no column does, every row takes the connection's file-wide test code. When that column carries
+something other than a test code, `test_code_values` says what each value means. The Madagascar
+FluoroCycler workbook numbers its detection channels:
+
+```json
+"column_mapping": { "Sample ID": "sampleId", "Col": "testCode", "Calc. Conc.": "result", "Result": "interpretation" },
+"test_code_values": { "1": "VIH-1", "2": "IC" }
+```
+
+Every translated code must be a declared test. A value the map does not name is kept as the file
+carries it, so OpenELIS holds the row as a code nobody has mapped rather than guessing.
+
 ## Where each part of a result sits
 
 `configDefaults.extractionOverrides.resultParts` gives the field that holds each part. ASTM names
@@ -105,6 +120,29 @@ instrument's settings, histogram images or discriminators. Everything else is a 
 the profile does not declare still reaches OpenELIS, which holds it for review.
 
 A profile without `resultParts` is read as before.
+
+## Warnings about the sample
+
+Some instruments send yes or no warnings about the sample as records of their own: a hematology
+analyzer's alarms (Anemia, Platelet Clump?), a PCR run's internal-control validity. `sample_flags`
+names them: the codes, the value that means raised, and a name per code where the record carries
+none. A record carrying one of these codes is never a result. A raised one goes in the bundle as
+an Observation classified `SAMPLE_FLAG`, and OpenELIS shows it with the sample's results and keeps
+it as a note on the analysis once accepted; one not raised is dropped. The record's code and value
+are read where a result's are, whatever the protocol; the instrument's name for the code, when it
+sends one, sits beside the code (OBX-3.2, R.3.5):
+
+```json
+"sample_flags": { "raisedValue": "T", "codes": ["12014", "15180-3"] }
+```
+
+A file carries no name, so a FILE profile names each flag:
+
+```json
+"sample_flags": { "raisedValue": "Invalid", "codes": ["IC"], "names": { "IC": "Internal control invalid" } }
+```
+
+A profile without `sample_flags` has no record that is a warning.
 
 ## Number format
 

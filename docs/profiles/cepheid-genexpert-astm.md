@@ -20,6 +20,21 @@ profile, which the Bridge no longer ships, and is not a later revision of it (ru
 The example messages in 303-0251 section 2.1.1 and 302-7279 section 6 are in
 `src/test/resources/cepheid-examples/`; `GeneXpertBaselineProfileTest` replays all of them.
 
+## Record kinds
+
+What the instrument sends, by kind (OpenELIS analyzer spec, rule 11), and the section that
+declares it:
+
+| Kind                        | Records                                                                                          | Declared in                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| result for an ordered test  | the assay's result with its call, and its analyte and complement records other than the controls | `default_test_mappings`, read by `resultParts`; `resultRecordSelection` ALL |
+| value on a control material | a run whose specimen the recognition rules name as a control                                     | `controlResultRecognition`                                                  |
+| warning about the sample    | the cartridge's internal controls, `SPC`, `IQS-H`, `IQS-L` and their `Ct` and `EndPt`, raised on `FAIL` | `sample_flags`                                                              |
+| not received                | none                                                                                             |                                                                             |
+
+A failed run is a result value (`ERROR`, `NO RESULT`, `INVALID`), not a flag: `run_failure_values`
+on each test.
+
 ## Tests
 
 The codes are Cepheid's suggested host test and result codes. They are user-defined on each
@@ -95,6 +110,15 @@ A record is identified by its code and its sub-identity: the analyte and complem
 the vendor's sub-ID notation (`HIV-1&Ct`, `&LOG`, empty for the main result). An off-scale call
 (`DETECTED` with flag `<` and range `40.00 to 10000000.00`) arrives as a quantity of the limit
 with its comparator (rules 11 and 17).
+
+## The cartridge's internal controls
+
+The cartridge's own checks are warnings about the sample, not parts of a test: the sample
+processing control (`SPC`, on each respiratory test) and the internal quantitation standards
+(`IQS-H` and `IQS-L`, on HIV-1 viral load), each with its `Ct` and `EndPt`, are declared under
+`sample_flags` and raised on `FAIL`. Their values are `PASS`, `FAIL`, `NA` and `NO RESULT`
+(303-0251 2.1.1; 303-3083 section 3). A control the cartridge reports under each of its tests is
+one flag on the sample.
 
 ## Discrepancies in the vendor documents
 

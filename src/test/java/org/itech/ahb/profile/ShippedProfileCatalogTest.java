@@ -20,14 +20,17 @@ class ShippedProfileCatalogTest {
 
   private static final Map<String, String> BASELINE_FINGERPRINTS = Map.of(
     "cepheid-genexpert-astm",
-    "sha256:1e2d53f6b797b25dbcd3c6947c5924ec1176b70b5dec2846fda691a6e74550ea",
+    "sha256:5d2ffee041a71c7d220fe5dda60f69c17a3fef357861fbfa83772c4f916eeca2",
     "hain-fluorocycler-xt",
-    "sha256:5989781fabb39c7e405f6f1427823af5f9a40bfd0721abf470fda8f95551f4f7",
+    "sha256:8f28785af6c5af38859c2b393093eb74d6cc6e4e786b22c587cebfa9e2a2a1ba",
+    "hain-fluorocycler-xt-madagascar",
+    "sha256:8c0d62edb064ef081883104d17b666be734c8c2723c8da80a3d5ec953825b775",
     "mindray-bc5380",
-    "sha256:045924336ca75aa61ac6b6b44f37df59d1636ac4e78195757c5d94f0f96e8da8",
+    "sha256:031b4198f23aa8dc4d21a9f20a148e7057fde4eafcb381d26d2aed6e6677621c",
     "thermo-quantstudio",
-    "sha256:9b5a84ddbc724ee696823898105a4f49edd41160fb9400bc51c109cda5d91ce1"
+    "sha256:b8c148e55f0907494058e7eb56603e157d818d103645668f91b585e5e0bf49e0"
   );
+
 
   @TempDir
   Path catalogDirectory;
@@ -75,7 +78,13 @@ class ShippedProfileCatalogTest {
 
     assertThat(catalog.latest())
       .extracting(revision -> revision.profile().path("profileMeta").path("id").asText())
-      .containsExactly("hain-fluorocycler-xt", "cepheid-genexpert-astm", "mindray-bc5380", "thermo-quantstudio");
+      .containsExactly(
+        "hain-fluorocycler-xt",
+        "hain-fluorocycler-xt-madagascar",
+        "cepheid-genexpert-astm",
+        "mindray-bc5380",
+        "thermo-quantstudio"
+      );
     assertThat(catalog.latest()).allSatisfy(revision -> {
       ObjectNode profile = revision.profile();
       assertThat(profile.path("catalog").path("source").asText()).isEqualTo("SHIPPED");
@@ -114,6 +123,28 @@ class ShippedProfileCatalogTest {
           // Every record is a result; the profile's result parts say what each one is.
           assertThat(selection.path("mode").asText()).isEqualTo("ALL");
           assertThat(extraction.path("resultParts").isObject()).isTrue();
+          // The cartridge's internal controls are warnings raised on FAIL, never parts of a test.
+          assertThat(profile.path("default_test_mappings").findValuesAsText("sub_identity"))
+            .noneMatch(identity -> identity.matches("(SPC|IQS-H|IQS-L)(&.*)?"));
+          assertThat(profile.path("sample_flags").path("raisedValue").asText()).isEqualTo("FAIL");
+          assertThat(profile.path("sample_flags").path("codes"))
+            .extracting(JsonNode::asText)
+            .contains("SPC", "SPC&Ct", "IQS-H", "IQS-L&EndPt");
+        }
+        case "hain-fluorocycler-xt-madagascar" -> {
+          assertThat(profile.path("result_value_order"))
+            .extracting(JsonNode::asText)
+            .containsExactly("result", "interpretation");
+          // The site workbook names the channel, not the test: 1 is the target, 2 the internal control.
+          assertThat(profile.path("column_mapping").path("Col").asText()).isEqualTo("testCode");
+          assertThat(profile.path("test_code_values").path("1").asText()).isEqualTo("VIH-1");
+          assertThat(profile.path("test_code_values").path("2").asText()).isEqualTo("IC");
+          // The internal control's validity is a warning about the sample, never a result.
+          assertThat(profile.path("default_test_mappings"))
+            .extracting(mapping -> mapping.path("test_code").asText())
+            .containsExactly("VIH-1");
+          assertThat(profile.path("sample_flags").path("raisedValue").asText()).isEqualTo("Invalid");
+          assertThat(profile.path("sample_flags").path("names").path("IC").asText()).isEqualTo("Internal control invalid");
         }
         case "mindray-bc5380" -> {
           JsonNode extraction = profile.path("configDefaults").path("extractionOverrides");
@@ -121,17 +152,28 @@ class ShippedProfileCatalogTest {
           assertThat(extraction.path("resultRecordSelection").path("mode").asText()).isEqualTo("EXCLUDE");
           assertThat(extraction.path("resultParts").isObject()).isTrue();
         }
-        case "thermo-quantstudio" -> assertThat(profile.path("result_value_order"))
-          .extracting(JsonNode::asText)
-          .containsExactly("result", "ctValue");
+        case "thermo-quantstudio" -> {
+          assertThat(profile.path("result_value_order")).extracting(JsonNode::asText).containsExactly("result", "ctValue");
+          // The IC row is a warning raised when its CT is Undetermined, never a result.
+          assertThat(profile.path("default_test_mappings"))
+            .extracting(mapping -> mapping.path("test_code").asText())
+            .containsExactly("VIH-1");
+          assertThat(profile.path("sample_flags").path("raisedValue").asText()).isEqualTo("Undetermined");
+          assertThat(profile.path("sample_flags").path("names").path("IC").asText())
+            .isEqualTo("Internal control not detected");
+        }
         default -> throw new AssertionError("Unexpected priority profile");
       }
     });
 
+    // Each baseline revision 1 carries the fingerprint the catalog computes for it.
     BASELINE_FINGERPRINTS.forEach((profileId, fingerprint) -> {
-      ObjectNode baseline = catalog.requireLatest(profileId).profile();
-      assertThat(baseline.path("catalog").path("revision").asInt()).as(profileId).isEqualTo(1);
+      ObjectNode baseline = catalog.require(profileId, 1).profile();
       assertThat(baseline.path("catalog").path("revisionFingerprint").asText()).as(profileId).isEqualTo(fingerprint);
     });
+    // The baseline is revision 1 of every profile until the baseline ships.
+    BASELINE_FINGERPRINTS.keySet().forEach(profileId ->
+      assertThat(catalog.history(profileId)).as(profileId).hasSize(1)
+    );
   }
 }

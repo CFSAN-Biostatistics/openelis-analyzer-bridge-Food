@@ -1,5 +1,8 @@
 package org.itech.ahb.outbox;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,6 +40,7 @@ public class OutboxDispatcher {
 
   /** Housekeeping cadence. Retention is measured in days, so hourly is frequent enough. */
   private static final Duration PURGE_INTERVAL = Duration.ofHours(1);
+  private static final ObjectMapper BUNDLE_READER = new ObjectMapper();
 
   /** Wake-ups from the receive path and the retry endpoint, so a new delivery does not wait for a poll. */
   private final BlockingQueue<Object> signals = new LinkedBlockingQueue<>(1);
@@ -230,6 +234,36 @@ public class OutboxDispatcher {
     }
   }
 
+  /**
+   * True when the bundle holds an Observation that is a result rather than a sample flag; an
+   * unreadable payload is left for OpenELIS to judge.
+   */
+  static boolean carriesAResult(String fhirJson) {
+    try {
+      for (JsonNode item : BUNDLE_READER.readTree(fhirJson).path("entry")) {
+        JsonNode resource = item.path("resource");
+        if ("Observation".equals(resource.path("resourceType").asText()) && !isSampleFlag(resource)) {
+          return true;
+        }
+      }
+      return false;
+    } catch (JsonProcessingException unreadable) {
+      return true;
+    }
+  }
+
+  private static boolean isSampleFlag(JsonNode observation) {
+    for (JsonNode extension : observation.path("extension")) {
+      if (
+        extension.path("url").asText().endsWith("/analyzer-result-classification") &&
+        "SAMPLE_FLAG".equals(extension.path("valueCode").asText())
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private void attempt(OutboxEntry entry) {
     if (entry.state() == OutboxState.RECEIVED) {
       // Persisted but never rendered: the bridge stopped between receiving and rendering. The
@@ -241,6 +275,16 @@ public class OutboxDispatcher {
     if (payload.isEmpty()) {
       log.error("Outbox entry {} is {} but holds no rendered payload; dead-lettering it", entry.id(), entry.state());
       store.markDeadLettered(entry.id(), FailureReason.RENDER_ERROR, "Entry has no rendered payload to deliver");
+      return;
+    }
+    if (!carriesAResult(payload.get())) {
+      // OpenELIS refuses a bundle without an Observation; sample flags alone have no result to sit on.
+      store.markDeadLettered(
+        entry.id(),
+        FailureReason.PARSE_NO_RESULTS,
+        "Accession " + entry.accession() + " has no result, only what the instrument said about the sample"
+      );
+      log.warn("Outbox entry {} (accession {}) holds no result; held, not sent", entry.id(), entry.accession());
       return;
     }
 

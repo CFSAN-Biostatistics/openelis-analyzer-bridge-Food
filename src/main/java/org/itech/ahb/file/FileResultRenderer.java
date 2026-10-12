@@ -42,7 +42,8 @@ public final class FileResultRenderer {
             context.selectedTestCode(),
             context.recognition(),
             context.layout(),
-            context.resultSelection()
+            context.resultSelection(),
+            context.testCodeValues()
           );
           case ".xls", ".xlsx" -> FileResultParser.parse(
             input,
@@ -50,7 +51,8 @@ public final class FileResultRenderer {
             context.selectedTestCode(),
             context.recognition(),
             context.layout(),
-            context.resultSelection()
+            context.resultSelection(),
+            context.testCodeValues()
           );
           case ".ods" -> FileResultParser.parseOds(
             input,
@@ -58,7 +60,8 @@ public final class FileResultRenderer {
             context.selectedTestCode(),
             context.recognition(),
             context.layout(),
-            context.resultSelection()
+            context.resultSelection(),
+            context.testCodeValues()
           );
           default -> throw new IllegalArgumentException("Unsupported retained FILE extension: " + context.extension());
         };
@@ -77,7 +80,9 @@ public final class FileResultRenderer {
       snapshot.setControlResultRecognition(context.recognition());
       snapshot.setRecognitionFingerprint(context.recognitionFingerprint());
       snapshot.setCodeToLoinc(context.codeToLoinc());
-      snapshot.setResultReading(new ResultReading(null, null, '.', Map.of(), context.profileCodeByInstrumentCode()));
+      snapshot.setResultReading(
+        new ResultReading(null, null, '.', Map.of(), context.profileCodeByInstrumentCode(), context.sampleFlags())
+      );
       List<RenderedDelivery> deliveries = new ArrayList<>();
       for (var accession : parsed) {
         deliveries.add(
@@ -121,9 +126,9 @@ public final class FileResultRenderer {
       analyzerEntry.getControlResultRecognition(),
       analyzerEntry.getRecognitionFingerprint()
     );
+    ResultReading reading = analyzerEntry.getResultReading();
     return FhirBundleBuilder.buildNormalizedBundle(
-      parsed.accessionNumber(),
-      parsed.underProfileCodes(analyzerEntry.getResultReading()).results(),
+      parsed.underProfileCodes(reading).withFileSampleFlags(reading == null ? null : reading.sampleFlags()),
       context,
       analyzerEntry::getLoincForProfileCode,
       FileDeliveryIdentity.forAccession(analyzerEntry.getBridgeConnectionId(), contentHash, parsed.accessionNumber())

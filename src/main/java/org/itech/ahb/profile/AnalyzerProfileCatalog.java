@@ -360,7 +360,7 @@ public final class AnalyzerProfileCatalog {
   }
 
   private List<String> validationIssues(ProfileDraft draft) {
-    return validator.validationIssues(publicationCandidate(draft, draft.updatedBy(), draft.updatedAt()));
+    return validator.draftIssues(publicationCandidate(draft, draft.updatedBy(), draft.updatedAt()));
   }
 
   private static ObjectNode profileMetadata(ObjectNode profile) {

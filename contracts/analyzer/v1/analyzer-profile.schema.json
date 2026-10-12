@@ -94,10 +94,37 @@
       "uniqueItems": true,
       "items": { "enum": ["result", "ctValue", "interpretation"] }
     },
+    "test_code_values": {
+      "description": "What each value of the column mapped to testCode means, as a profile test code. A value not listed is kept as the file carries it.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/nonBlank" },
+      "additionalProperties": { "$ref": "#/$defs/nonBlank" }
+    },
     "sheet_detection": { "$ref": "#/$defs/sheetDetection" },
     "default_test_mappings": {
       "type": "array",
       "items": { "$ref": "#/$defs/testMapping" }
+    },
+    "sample_flags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raisedValue", "codes"],
+      "description": "The records that are yes or no warnings about the sample, such as a hematology analyzer's alarms or a PCR run's internal-control validity. A record carrying one of these codes is never a result: a raised one travels with the sample's results as a flag, and one not raised says nothing. Its code and value are read where a result's are; its name is the profile's where given, else the instrument's.",
+      "properties": {
+        "raisedValue": { "type": "string", "minLength": 1 },
+        "codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "names": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/nonBlank" },
+          "additionalProperties": { "$ref": "#/$defs/nonBlank" }
+        }
+      }
     },
     "configDefaults": { "type": "object" },
     "connectionFields": {
