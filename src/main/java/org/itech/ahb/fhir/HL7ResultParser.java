@@ -2,18 +2,23 @@ package org.itech.ahb.fhir;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Set;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.itech.ahb.fhir.FhirBundleBuilder.AnalyzerResult;
 import org.itech.ahb.profile.ControlRecognitionRule;
 import org.itech.ahb.profile.ControlResultRecognition;
 import org.itech.ahb.profile.ControlResultRecognitionEvaluator;
+import org.itech.ahb.profile.Hl7ResultParts;
+import org.itech.ahb.profile.Hl7ResultRecordSelection;
 import org.itech.ahb.profile.Hl7SpecimenPosition;
+import org.itech.ahb.profile.ResultReading;
 
 /**
  * Extracts lab results from HL7 v2 ORU^R01 messages.
@@ -57,23 +62,50 @@ public class HL7ResultParser {
     ControlResultRecognition recognition,
     Hl7SpecimenPosition specimenPosition
   ) {
-    java.util.Objects.requireNonNull(specimenPosition, "specimenPosition");
+    return parse(segmentLines, recognition, specimenPosition, Hl7ResultRecordSelection.all(), null);
+  }
+
+  /**
+   * Parse HL7 v2 segment lines, reading every part of each observation the profile selects where
+   * the pinned profile says it sits. A profile that declares no result parts is read as it always
+   * was.
+   *
+   * @param reading how the pinned profile reads a result; null for the established reading
+   */
+  public static ParsedResults parse(
+    List<String> segmentLines,
+    ControlResultRecognition recognition,
+    Hl7SpecimenPosition specimenPosition,
+    Hl7ResultRecordSelection resultRecordSelection,
+    ResultReading reading
+  ) {
+    Objects.requireNonNull(specimenPosition, "specimenPosition");
+    Objects.requireNonNull(resultRecordSelection, "resultRecordSelection");
     if (segmentLines == null || segmentLines.isEmpty()) {
       return null;
     }
+    Hl7ResultParts parts = reading == null ? null : reading.hl7Parts();
 
     String accession = null;
     SegmentFields fieldValues = new SegmentFields();
     List<AnalyzerResult> results = new ArrayList<>();
     Delimiters delimiters = new Delimiters('|', '^', '~', '&');
     PendingObservation pending = null;
+    InstrumentPatient patient = null;
+    String specimenDescriptor = null;
+    // The result a following NTE belongs to; -1 when the last observation was not one.
+    int noteTarget = -1;
 
     for (String line : segmentLines) {
       if (line == null || line.length() < 4) continue;
       String segment = line.substring(0, 3);
       if (pending != null && List.of("OBX", "OBR", "ORC", "PID", "MSH").contains(segment)) {
         results.add(recognize(pending.result(), pending.specimenId(), pending.fields(), recognition));
+        noteTarget = -1;
         pending = null;
+      }
+      if (!"NTE".equals(segment) && !"SPM".equals(segment)) {
+        noteTarget = -1;
       }
       if (specimenPosition == Hl7SpecimenPosition.FOLLOWING_OBX && "OBX".equals(segment)) {
         fieldValues.removeSegment("SPM");
@@ -91,15 +123,36 @@ public class HL7ResultParser {
       if ("OBR".equals(segment)) {
         accession = parseAccessionFromOBR(line, delimiters);
       }
+      if (parts != null) {
+        if ("PID".equals(segment)) {
+          patient = readPatient(fieldValues, parts);
+        }
+        String descriptor = Hl7ResultParts.read(parts.specimenDescriptor(), fieldValues);
+        if (!descriptor.isEmpty()) {
+          specimenDescriptor = descriptor;
+        }
+        if ("NTE".equals(segment)) {
+          String note = Hl7ResultParts.read(parts.note(), fieldValues);
+          if (!note.isEmpty() && pending != null) {
+            pending = pending.withNote(note);
+          } else if (!note.isEmpty() && noteTarget >= 0) {
+            AnalyzerResult target = results.get(noteTarget);
+            results.set(noteTarget, target.withParts(target.parts().withNote(note)));
+          }
+        }
+      }
 
-      if ("OBX".equals(segment)) {
-        AnalyzerResult result = parseObxSegment(line, delimiters);
+      if ("OBX".equals(segment) && resultRecordSelection.includes(fieldValues)) {
+        AnalyzerResult result = parts == null
+          ? parseObxSegment(line, delimiters)
+          : readObservation(fieldValues, parts, reading, delimiters);
         if (result != null) {
           String specimenId = actualAccession(accession);
           if (specimenPosition == Hl7SpecimenPosition.FOLLOWING_OBX) {
             pending = new PendingObservation(result, specimenId, fieldValues.snapshot());
           } else {
             results.add(recognize(result, specimenId, fieldValues, recognition));
+            noteTarget = parts == null ? -1 : results.size() - 1;
           }
         }
       }
@@ -112,10 +165,96 @@ public class HL7ResultParser {
     // Recognition already used instrument evidence, never this display-only fallback.
     if (accession == null) accession = "HL7-UNKNOWN";
 
-    return results.isEmpty() ? null : new ParsedResults(accession, results);
+    return results.isEmpty() ? null : new ParsedResults(accession, results, patient, specimenDescriptor);
   }
 
-  private record PendingObservation(AnalyzerResult result, String specimenId, SegmentFields fields) {}
+  private record PendingObservation(AnalyzerResult result, String specimenId, SegmentFields fields) {
+    PendingObservation withNote(String note) {
+      return new PendingObservation(result.withParts(result.parts().withNote(note)), specimenId, fields);
+    }
+  }
+
+  /**
+   * One observation, every part read from the field the profile names. OBX-2 says whether the
+   * value is a number (NM, SN) or an answer; an observation with no value says nothing, so it is
+   * not a result.
+   */
+  private static AnalyzerResult readObservation(
+    Map<String, String> fields,
+    Hl7ResultParts parts,
+    ResultReading reading,
+    Delimiters delimiters
+  ) {
+    String testCode = Hl7ResultParts.read(parts.testCode(), fields);
+    String value = Hl7ResultParts.read(parts.value(), fields);
+    if (testCode.isEmpty() || value.isEmpty()) {
+      return null;
+    }
+    String valueType = Hl7ResultParts.read("OBX.2", fields);
+    String comparator = null;
+    String numberText = value;
+    if ("SN".equals(valueType)) {
+      // SN is comparator^number[^separator^number]: a ratio or a range is not one number.
+      String[] components = value.split(Pattern.quote(String.valueOf(delimiters.component())), -1);
+      String sign = components[0].trim();
+      boolean single = components.length < 3 || components[2].isBlank();
+      numberText = single && SN_COMPARATORS.contains(sign) && components.length > 1 ? components[1].trim() : "";
+      comparator = sign.isEmpty() || "=".equals(sign) ? null : sign;
+    }
+    String canonical = reading.canonicalNumber(numberText);
+    boolean numeric = ("NM".equals(valueType) || "SN".equals(valueType)) && NumericValue.isBoundedDecimal(canonical);
+    if (!numeric) {
+      comparator = null;
+    }
+    String subIdentity = Hl7ResultParts.read(parts.subIdentity(), fields);
+    String unit = Hl7ResultParts.read(parts.unit(), fields);
+    String range = Hl7ResultParts.read(parts.range(), fields);
+    List<String> flags = Arrays.stream(split(Hl7ResultParts.read(parts.flag(), fields), delimiters.repetition()))
+      .map(String::trim)
+      .filter(flag -> !flag.isEmpty())
+      .toList();
+    RecordParts recordParts = new RecordParts(
+      subIdentity,
+      numeric ? null : value,
+      numeric ? canonical : null,
+      comparator,
+      null,
+      blankToNull(range),
+      flags,
+      null,
+      null,
+      blankToNull(Hl7ResultParts.read(parts.operator(), fields)),
+      blankToNull(Hl7ResultParts.read(parts.instrument(), fields)),
+      blankToNull(Hl7ResultParts.read(parts.status(), fields)),
+      reading.isRunFailure(testCode, subIdentity, value),
+      List.of()
+    );
+    AnalyzerResult result = numeric
+      ? AnalyzerResult.numeric(testCode, testCode, "SN".equals(valueType) ? canonical : value, blankToNull(unit))
+      : AnalyzerResult.text(testCode, testCode, value);
+    String completed = Hl7ResultParts.read(parts.completed(), fields);
+    String time = completed.isEmpty() ? null : hl7Time(completed);
+    if (time != null) {
+      result = result.withTimestamp(time);
+    }
+    return result.withParts(recordParts);
+  }
+
+  /** The patient the instrument reported: the identifier, and the family and given names of the name field. */
+  private static InstrumentPatient readPatient(Map<String, String> fields, Hl7ResultParts parts) {
+    String identifier = Hl7ResultParts.read(parts.patientId(), fields);
+    String name = parts.patientName();
+    String family = name == null ? "" : Hl7ResultParts.read(name + ".1", fields);
+    String given = name == null ? "" : Hl7ResultParts.read(name + ".2", fields);
+    if (identifier.isEmpty() && family.isEmpty() && given.isEmpty()) {
+      return null;
+    }
+    return new InstrumentPatient(blankToNull(identifier), blankToNull(family), blankToNull(given));
+  }
+
+  private static String blankToNull(String text) {
+    return text == null || text.isEmpty() ? null : text;
+  }
 
   /**
    * Recognition fields keyed by path ({@code OBX.5.1}), held per segment so that replacing a
@@ -222,6 +361,43 @@ public class HL7ResultParser {
   }
 
   private record Delimiters(char field, char component, char repetition, char subcomponent) {}
+
+  private static final Set<String> SN_COMPARATORS = Set.of("", "=", "<", ">", "<=", ">=");
+  private static final Pattern HL7_TIME = Pattern.compile(
+    "(\\d{8}(?:\\d{2}(?:\\d{2}(?:\\d{2})?)?)?)(?:\\.\\d{1,4})?([+-]\\d{4})?"
+  );
+  private static final java.time.format.DateTimeFormatter FHIR_DATE_TIME = java.time.format.DateTimeFormatter.ofPattern(
+    "yyyy-MM-dd'T'HH:mm:ssXXX"
+  );
+
+  /**
+   * An HL7 DTM (YYYYMMDD[HH[MM[SS[.S[S[S[S]]]]]]][+/-ZZZZ]) as FHIR dateTime: a date alone stays a
+   * date, a time keeps its offset or takes the Bridge's zone, and fractions of a second are dropped.
+   */
+  static String hl7Time(String raw) {
+    java.util.regex.Matcher match = HL7_TIME.matcher(raw.trim());
+    if (!match.matches()) {
+      log.warn("Ignoring unreadable HL7 time '{}'", raw);
+      return null;
+    }
+    String digits = match.group(1);
+    if (digits.length() == 8) {
+      return ASTMResultParser.astmTime(digits);
+    }
+    try {
+      java.time.LocalDateTime local = java.time.LocalDateTime.parse(
+        (digits + "0000").substring(0, 14),
+        java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+      );
+      java.time.ZoneId zone = match.group(2) == null
+        ? java.time.ZoneId.systemDefault()
+        : java.time.ZoneOffset.of(match.group(2).substring(0, 3) + ":" + match.group(2).substring(3));
+      return local.atZone(zone).format(FHIR_DATE_TIME);
+    } catch (java.time.DateTimeException e) {
+      log.warn("Ignoring unreadable HL7 time '{}'", raw);
+      return null;
+    }
+  }
 
   /**
    * Parse HL7 from raw message string (splits on segment terminators first).
