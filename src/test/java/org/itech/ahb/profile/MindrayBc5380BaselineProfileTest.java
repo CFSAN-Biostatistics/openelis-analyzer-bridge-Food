@@ -30,7 +30,7 @@ class MindrayBc5380BaselineProfileTest {
 
   private static final Path EXAMPLES = Path.of("src", "test", "resources", "mindray-examples");
   /** The manual differential the C.3.3 message sends in its microscope exam (OBR-4 00002). */
-  private static final List<String> MICROSCOPE_EXAM_SENT = List.of(
+  private static final List<String> MANUAL_DIFFERENTIAL = List.of(
     "747-6",
     "783-1",
     "749-2",
@@ -47,10 +47,10 @@ class MindrayBc5380BaselineProfileTest {
     "13599-6",
     "744-3",
     "18309-5",
-    "31112-6",
-    "11000",
-    "11001"
+    "31112-6"
   );
+  /** The microscope exam's two Mindray-coded percentages, which have no LOINC code to declare. */
+  private static final List<String> MICROSCOPE_EXAM_UNDECLARED = List.of("11000", "11001");
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @Test
@@ -72,6 +72,7 @@ class MindrayBc5380BaselineProfileTest {
       .results()
       .stream()
       .filter(result -> declared.containsKey(result.testCode()))
+      .filter(result -> !MANUAL_DIFFERENTIAL.contains(result.testCode()))
       .forEach(result -> declaredResults.put(result.testCode(), result));
     assertThat(declaredResults.keySet()).containsExactly(
       "6690-2",
@@ -96,6 +97,18 @@ class MindrayBc5380BaselineProfileTest {
     });
     assertThat(declaredResults.get("718-7").value()).isEqualTo("65");
     assertThat(declaredResults.get("718-7").parts().flags()).containsExactly("L");
+    // The microscope exam's manual differential is declared, in percent, as Mindray sends it.
+    List<AnalyzerResult> manual = parsed
+      .results()
+      .stream()
+      .filter(result -> MANUAL_DIFFERENTIAL.contains(result.testCode()))
+      .toList();
+    assertThat(manual).extracting(AnalyzerResult::testCode).containsExactlyElementsOf(MANUAL_DIFFERENTIAL);
+    manual.forEach(result -> {
+      assertThat(result.isNumeric()).as(result.testCode()).isTrue();
+      assertThat(result.units()).as(result.testCode()).isEqualTo("%");
+      assertThat(declared.get(result.testCode()).path("unit").asText()).as(result.testCode()).isEqualTo("%");
+    });
     // Every declared test is a row of the example, with or without a value.
     assertThat(obxCodes("bc5380-c.3.3.hl7")).containsAll(declared.keySet());
   }
@@ -104,12 +117,12 @@ class MindrayBc5380BaselineProfileTest {
   void theExampleArrivesAsTheDeclaredResultsAndTheAlarmsItRaised() throws Exception {
     ParsedResults parsed = replay("bc5380-c.3.3.hl7");
 
-    // Settings and histograms are not results and the alarms travel with the sample. The microscope
-    // exam arrives as results the profile does not declare: each lab maps or excludes them.
+    // Settings and histograms are not results and the alarms travel with the sample. Of the
+    // microscope exam, only the two percentages without a LOINC code arrive undeclared.
     Set<String> codes = new LinkedHashSet<>();
     parsed.results().forEach(result -> codes.add(result.testCode()));
     codes.removeAll(declaredTests().keySet());
-    assertThat(codes).containsExactlyInAnyOrderElementsOf(MICROSCOPE_EXAM_SENT);
+    assertThat(codes).containsExactlyInAnyOrderElementsOf(MICROSCOPE_EXAM_UNDECLARED);
     assertThat(parsed.sampleFlags()).containsExactly(
       new SampleFlag("12014", "Anemia", "T"),
       new SampleFlag("15180-3", "Hypochromia", "T")
