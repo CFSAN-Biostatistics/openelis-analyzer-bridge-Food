@@ -24,11 +24,11 @@ declares it:
 
 | Kind                               | Records                                                                                                       | Declared in                                                        |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| result for an ordered test         | the CBC parameters of Table 10 (the "Tests" section below), one OBX each                                      | `default_test_mappings`, read by `resultParts`                     |
+| result for an ordered test         | the CBC parameters of Table 10 (the "Tests" section below), one OBX each, and the microscope exam's manual differential (the "Microscope exam" section below) | `default_test_mappings`, read by `resultParts`                     |
 | value on a control material        | a QC message (C.3.3, XR QC), whose sample the recognition rules name as a control                             | `controlResultRecognition`                                         |
 | warning about the sample           | the alarms of Table 10's "Abnormal alarm information", `T` when raised (the "Alarms" section below)          | `sample_flags`                                                     |
 | not received                       | the instrument's settings and the histogram segments (the "Records that are not results" section below)     | `resultRecordSelection` EXCLUDE                                    |
-| declared by the instrument only    | the microscope exam's differential, which the profile does not declare: OpenELIS holds it until the lab maps or excludes it (the "Microscope exam" section below) | nothing; by design |
+| declared by the instrument only    | the microscope exam's two Mindray-coded percentages, 11000 and 11001, which have no LOINC code to declare: OpenELIS holds them until the lab maps or excludes them | nothing; the schema requires a LOINC code |
 
 ## Tests
 
@@ -100,10 +100,17 @@ scattergram discriminators, lengths, adjustment marks and images (15000 to 15200
 
 The microscope exam data Table 10 lists under OBR-4 `00002` Manual Count (Table 9) is what a
 technician enters on the analyzer: blood type (882-1), WBC, RBC and PLT morphology (11156-7,
-6742-1, 11125-2) and the 19 manual differential percentages (747-6 to 31112-6, 11000, 11001). The
-profile does not declare these codes, so they reach OpenELIS as results it holds until a lab maps
-them to its own manual differential tests or excludes them on the analyzer's mapping page. The
-C.3.3 message sends every manual percentage as 0.0, which no counted differential is.
+6742-1, 11125-2) and the 19 manual differential percentages (747-6 to 31112-6, 11000, 11001).
+
+The profile declares the 17 manual percentages that carry a LOINC code, each with the name the
+analyzer sends ("Neuts Seg%. Manual") and the unit `%` of C.3.3, so a lab sees them by name. No
+local test carries those codes in most catalogs, so OpenELIS starts each one off; a lab that counts
+differentials on the analyzer turns them on and maps them to its manual differential tests.
+11000 (Undefined Cells%) and 11001 (Other Abnormal Cells%) have no LOINC code, which the schema
+requires, so they stay undeclared and OpenELIS holds them until a lab maps or excludes them. Blood
+type and the morphology fields send text whose values the manual does not list, so they stay
+undeclared too. The C.3.3 message sends every manual percentage as 0.0, which no counted
+differential is.
 
 ## Alarms
 
