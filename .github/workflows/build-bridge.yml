@@ -1,19 +1,14 @@
-name: Build and Publish Bridge
+name: Build and Publish Custom Analyzer Bridge
 
 on:
   push:
-    branches: [food-env]
-    paths:
-      - 'src/**'
-      - 'pom.xml'
-      - 'Dockerfile'
+    branches: [food-env] # Or your preferred branch
   workflow_dispatch:
 
 jobs:
   build-and-publish:
-    name: Build + Publish Bridge Image
+    name: Build and Publish Bridge to Quay.io
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,44 +18,26 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: 'temurin'
+          java-version: '21'
+          cache: maven
 
-      - name: Cache local Maven repository
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+      - name: Build astm-http-lib submodule
+        run: mvn -pl astm-http-lib -am clean install -DskipTests
 
-      # Inject safe, public configuration properties that map directly to environments
-      - name: Inject Public Configuration Framework
+      - name: Inject Secure Configuration Placeholders
         run: |
           mkdir -p src/main/resources
-          cat << 'EOF' > src/main/resources/application.yml
-          # Safe, public defaults. Overridden at runtime on the host via Docker Compose.
-          org:
-            itech:
-              ahb:
-                forward-http-server:
-                  uri: "${FORWARD_URI:https://localhost:8443}"
-                  health-uri: "${FORWARD_HEALTH_URI:https://localhost:8443/health}"
-                  insecure-tls: ${FORWARD_INSECURE_TLS:false}
-          management:
-            endpoint:
-              health:
-                show-details: "${HEALTH_SHOW_DETAILS:never}"
-          bridge:
-            security:
-              password: "${BRIDGE_PASS:changeme}"
-              username: "${BRIDGE_USER:bridge}"
-            auth:
-              password: "${BRIDGE_PASS:changeme}"
-              username: "${BRIDGE_USER:bridge}"
+          cat << 'EOF' > src/main/resources/application.properties
+          # These values are secure placeholders to be overridden by Docker Compose
+          org.itech.ahb.forward-http-server.uri=${FORWARD_URI}
+          org.itech.ahb.forward-http-server.health-uri=${FORWARD_HEALTH_URI}
+          org.itech.ahb.forward-http-server.insecure-tls=${FORWARD_INSECURE_TLS:true}
+          management.endpoint.health.show-details=${HEALTH_SHOW_DETAILS:always}
+          bridge.security.password=${BRIDGE_PASS:changeme}
           EOF
 
-      - name: Build main project
+      - name: Build Main Project
         run: mvn clean package -DskipTests
 
       - name: Authenticate to Quay.io
@@ -73,7 +50,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
-        run: |
-          docker build -t quay.io/galaxytrakr/openelis-analyzer-bridge:latest .
-          docker push quay.io/galaxytrakr/openelis-analyzer-bridge:latest
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: quay.io/galaxytrakr/openelis-analyzer-bridge:latest
+          cache-from: type=registry,ref=quay.io/galaxytrakr/openelis-analyzer-bridge:buildcache
+          cache-to: type=registry,ref=quay.io/galaxytrakr/openelis-analyzer-bridge:buildcache,mode=max
