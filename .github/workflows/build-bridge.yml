@@ -1,18 +1,33 @@
-name: Build and Publish Custom Analyzer Bridge
+name: Build and Publish Backend and Bridge
 
 on:
   push:
-    branches: [food-env] # Or your preferred branch
+    branches: [food-env]
   workflow_dispatch:
 
 jobs:
-  build-and-publish:
-    name: Build and Publish Bridge to Quay.io
+  # Your existing backend job remains unchanged
+  build-and-publish-backend:
+    name: Build + Publish Backend Image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          submodules: recursive
+      # ... (your existing backend steps) ...
+
+  # CORRECTED PARALLEL BRIDGE BUILD JOB 🚀
+  build-and-publish-bridge:
+    name: Build + Publish Bridge Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Analyzer Bridge Repository
+        uses: actions/checkout@v4
+        with:
+          # Checks out the official bridge repo into 'bridge-repo' subdirectory
+          repository: DIGI-UW/openelis-analyzer-bridge
+          path: bridge-repo
           submodules: recursive
 
       - name: Set up JDK 21
@@ -20,24 +35,40 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-          cache: maven
 
-      - name: Build astm-http-lib submodule
-        run: mvn -pl astm-http-lib -am clean install -DskipTests
+      - name: Cache local Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('bridge-repo/**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
 
+      # 1. Inject public placeholders directly into the resources folder of the checked-out code
       - name: Inject Secure Configuration Placeholders
+        working-directory: ./bridge-repo
         run: |
           mkdir -p src/main/resources
           cat << 'EOF' > src/main/resources/application.properties
-          # These values are secure placeholders to be overridden by Docker Compose
-          org.itech.ahb.forward-http-server.uri=${FORWARD_URI}
-          org.itech.ahb.forward-http-server.health-uri=${FORWARD_HEALTH_URI}
-          org.itech.ahb.forward-http-server.insecure-tls=${FORWARD_INSECURE_TLS:true}
-          management.endpoint.health.show-details=${HEALTH_SHOW_DETAILS:always}
+          # Public default placeholders. Handled securely via docker-compose envs on-host.
+          org.itech.ahb.forward-http-server.uri=${FORWARD_URI:https://localhost:8443}
+          org.itech.ahb.forward-http-server.health-uri=${FORWARD_HEALTH_URI:https://localhost:8443/health}
+          org.itech.ahb.forward-http-server.insecure-tls=${FORWARD_INSECURE_TLS:false}
+          management.endpoint.health.show-details=${HEALTH_SHOW_DETAILS:never}
           bridge.security.password=${BRIDGE_PASS:changeme}
+          bridge.security.username=${BRIDGE_USER:bridge}
+          bridge.auth.password=${BRIDGE_PASS:changeme}
+          bridge.auth.username=${BRIDGE_USER:bridge}
           EOF
 
-      - name: Build Main Project
+      # 2. Build the astm-http-lib submodule first (pointing to bridge-repo)
+      - name: Build astm-http-lib submodule
+        working-directory: ./bridge-repo
+        run: mvn -pl astm-http-lib -am clean install -DskipTests
+
+      # 3. Build the main bridge package
+      - name: Build main project
+        working-directory: ./bridge-repo
         run: mvn clean package -DskipTests
 
       - name: Authenticate to Quay.io
@@ -50,10 +81,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push Docker Image
+      # 4. Build and Push using the official Dockerfile inside the checked-out bridge-repo [source: 1]
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./bridge-repo
           push: true
           tags: quay.io/galaxytrakr/openelis-analyzer-bridge:latest
           cache-from: type=registry,ref=quay.io/galaxytrakr/openelis-analyzer-bridge:buildcache
