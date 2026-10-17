@@ -44,13 +44,13 @@ jobs:
 
       # 2. Compile the multi-module dependencies inside the actions runner
       - name: Build astm-http-lib submodule
-        working-directory: ./bridge-source
-        run: mvn -pl astm-http-lib -am clean install -DskipTests
+        working-directory: ./bridge-source/astm-http-lib
+        run: mvn -B clean install -DskipTests
 
       - name: Build main project
         working-directory: ./bridge-source
-        run: mvn clean package -DskipTests
-
+        run: mvn -B clean package -DskipTests
+        
       # 3. Generate a custom, diagnostic-rich Dockerfile on-the-fly
       - name: Generate Debug-Ready Dockerfile
         run: |
