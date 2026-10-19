@@ -85,7 +85,7 @@ public final class BridgeIdentity {
       "-dname",
       "CN=openelis-analyzer-bridge",
       "-ext",
-      "SAN=dns:localhost,ip:127.0.0.1",
+      "SAN=dns:localhost,dns:analyzer-bridge,dns:openelis-analyzer-bridge,ip:127.0.0.1",
       "-keystore",
       keystore.toString(),
       "-storetype",
